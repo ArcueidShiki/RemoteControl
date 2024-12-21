@@ -1,5 +1,5 @@
 // RemoteCtrl.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
+// Set Property->Linker->1. Entry point: mainCRTStartup, 2. SubSystem: Windows.
 
 #include "pch.h"
 #include "framework.h"
@@ -39,7 +39,7 @@ int main()
             int count = 0;
             while (pServer)
             {
-                if (pServer->AcceptClient() == FALSE)
+                if (!pServer->AcceptClient())
                 {
                     if (count > 3)
                     {
@@ -50,11 +50,7 @@ int main()
                     count++;
                 }
 
-				if (pServer->DealCommand() == -1)
-				{
-					MessageBox(NULL, _T("无法正常处理用户命令"), _T("处理用户命令失败!"), MB_OK | MB_ICONERROR);
-					break;
-				}
+				int ret = pServer->DealCommand();
             }
         }
     }
