@@ -1,7 +1,24 @@
 #pragma once
 #include "pch.h"
 #include "framework.h"
-//#include "stdio.h"
+
+#define PACKET_HEAD 0xFEFF
+
+class CPacket
+{
+public:
+	CPacket();
+	CPacket(const CPacket& other);
+	CPacket(const BYTE* pData, size_t& nSize);
+	CPacket& operator=(const CPacket& other);
+	~CPacket() {}
+public:
+	WORD sHead;	// FE FF
+	DWORD nLength; // packet length
+	WORD sCmd; // conctrol command
+	std::string strData;
+	WORD sSum; // check sum / crc
+};
 
 class CServerSocket
 {
@@ -30,4 +47,5 @@ private:
 	static CHelper m_helper;
 	SOCKET m_socket;
 	SOCKET m_client;
+	CPacket m_packet;
 };

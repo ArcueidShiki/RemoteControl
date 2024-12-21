@@ -141,22 +141,38 @@ int CServerSocket::DealCommand()
 	{
 		return -1;
 	}
-	char buf[1024] = { 0 };
+	// tcp no data border
+	// desgin tcp package:
+	// 1. dstinguish different package or leftover
+	// 2. sniffer package, penetration
+	// 1~2 byte: package head : FFFE/FEFE
+	// 3~4 byte: package length
+	// 5~n-2 byte: package data
+	// n-1~n byte: package check: md5checksum, crc16, crc32
+#define BUF_SIZE 4096
+	char* buf = new char[BUF_SIZE];
+	memset(buf, 0, BUF_SIZE);
+	size_t index = 0;
 	while (TRUE)
 	{
-		memset(buf, 0, sizeof(buf));
-		int len = recv(m_client, buf, sizeof(buf), 0);
+		size_t len = recv(m_client, buf + index, BUF_SIZE - index, 0);
 		if (len <= 0)
 		{
 			return -1;
 		}
-		if (strcmp(buf, "exit") == 0)
+		index += len;
+		len = index;
+		m_packet = CPacket((BYTE*)buf, len);
+		if (len > 0)
 		{
-			break;
+			// move unparse bytes leftover to head of buffer(parsed bytes),
+			memmove(buf, buf + len, BUF_SIZE - len);
+			// after moving, the unused spacec for receiving data
+			index -= len;
+			return m_packet.sCmd;
 		}
-		// TODO handle command
 	}
-	return 0;
+	return -1;
 }
 
 BOOL CServerSocket::Send(const char* pData, size_t nSize)
@@ -166,4 +182,90 @@ BOOL CServerSocket::Send(const char* pData, size_t nSize)
 		return FALSE;
 	}
 	return TRUE;
+}
+
+CPacket::CPacket()
+	: sHead(0)
+	, nLength(0)
+	, sCmd(0)
+	, sSum(0)
+{
+}
+
+CPacket::CPacket(const BYTE* pData, size_t& nSize)
+{
+	// head
+	size_t i = 0;
+	for (; i < nSize; i++)
+	{
+		if (*(WORD*)(pData + i) == PACKET_HEAD)
+		{
+			sHead += PACKET_HEAD;
+			i += sizeof(sHead); // skip head
+			break;
+		}
+	}
+
+	// length			length + cmd + sum
+	if (i + sizeof(nLength) + sizeof(sCmd) + sizeof(sSum) > nSize)
+	{
+		nSize = 0;
+		return; // parse packet error.
+	}
+	nLength = *(DWORD*)(pData + i);
+	i += sizeof(nLength);
+
+	// cmd
+	if (nLength + i > nSize)
+	{
+		// message is not received completely, its larger than the packet
+		nSize = 0;
+		return;
+	}
+	sCmd = *(WORD*)(pData + i);
+	i += sizeof(sCmd);
+
+	// str data
+	DWORD dataLen = nLength - sizeof(sCmd) - sizeof(sSum);
+	strData.resize(dataLen);
+	memcpy((void*)strData.c_str(), pData + i, dataLen);
+	i += dataLen;
+
+	// check sum
+	sSum = *(WORD*)(pData + i);
+	WORD sum = 0;
+	for (size_t j = 0; j < strData.size(); j++)
+	{
+		sum += BYTE(strData[i]); // &0xFF
+	}
+	if (sum != sSum)
+	{
+		nSize = 0;
+		return;
+	}
+	i += sizeof(sSum);
+	// parse packet success.
+	nSize = i; // head length data
+}
+
+CPacket::CPacket(const CPacket &other)
+{
+	sHead = other.sHead;
+	nLength = other.nLength;
+	sCmd = other.sCmd;
+	strData = other.strData;
+	sSum = other.sSum;
+}
+
+CPacket& CPacket::operator=(const CPacket &other)
+{
+	if (this != &other)
+	{
+		sHead = other.sHead;
+		nLength = other.nLength;
+		sCmd = other.sCmd;
+		strData = other.strData;
+		sSum = other.sSum;
+	}
+	return *this;
 }

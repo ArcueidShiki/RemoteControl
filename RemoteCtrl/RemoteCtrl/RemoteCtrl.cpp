@@ -10,6 +10,13 @@
 #define new DEBUG_NEW
 #endif
 
+#if 0
+#pragma comment(linker, "/subsystem:windwos /entry:WinMainCRTStartup")
+#pragma comment(linker, "/subsystem:windwos /entry:mainCRTStartup")
+#pragma comment(linker, "/subsystem:console /entry:WinMainCRTStartup")
+#pragma comment(linker, "/subsystem:console /entry:mainCRTStartup")
+#endif
+
 
 // The one and only application object
 
