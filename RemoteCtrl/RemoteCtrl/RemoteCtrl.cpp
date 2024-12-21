@@ -1,12 +1,20 @@
 // RemoteCtrl.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
+// Set Property->Linker->1. Entry point: mainCRTStartup, 2. SubSystem: Windows.
 
 #include "pch.h"
 #include "framework.h"
 #include "RemoteCtrl.h"
+#include "ServerSocket.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
+#endif
+
+#if 0
+#pragma comment(linker, "/subsystem:windwos /entry:WinMainCRTStartup")
+#pragma comment(linker, "/subsystem:windwos /entry:mainCRTStartup")
+#pragma comment(linker, "/subsystem:console /entry:WinMainCRTStartup")
+#pragma comment(linker, "/subsystem:console /entry:mainCRTStartup")
 #endif
 
 
@@ -33,7 +41,24 @@ int main()
         }
         else
         {
-            // TODO: code your application's behavior here.
+            // global variable, only one instance
+            CServerSocket* pServer = CServerSocket::GetInstance();
+            int count = 0;
+            while (pServer)
+            {
+                if (!pServer->AcceptClient())
+                {
+                    if (count > 3)
+                    {
+						MessageBox(NULL, _T("无法正常接入用户，自动重试次数过多，程序退出"), _T("接入用户失败!"), MB_OK | MB_ICONERROR);
+						break;
+                    }
+                    MessageBox(NULL, _T("无法正常接入用户，自动重试"), _T("接入用户失败!"), MB_OK | MB_ICONERROR);
+                    count++;
+                }
+
+				int ret = pServer->DealCommand();
+            }
         }
     }
     else
