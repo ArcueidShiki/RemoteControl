@@ -4,6 +4,7 @@
 #include "pch.h"
 #include "framework.h"
 #include "RemoteCtrl.h"
+#include "ServerSocket.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -33,7 +34,28 @@ int main()
         }
         else
         {
-            // TODO: code your application's behavior here.
+            // global variable, only one instance
+            CServerSocket* pServer = CServerSocket::GetInstance();
+            int count = 0;
+            while (pServer)
+            {
+                if (pServer->AcceptClient() == FALSE)
+                {
+                    if (count > 3)
+                    {
+						MessageBox(NULL, _T("无法正常接入用户，自动重试次数过多，程序退出"), _T("接入用户失败!"), MB_OK | MB_ICONERROR);
+						break;
+                    }
+                    MessageBox(NULL, _T("无法正常接入用户，自动重试"), _T("接入用户失败!"), MB_OK | MB_ICONERROR);
+                    count++;
+                }
+
+				if (pServer->DealCommand() == -1)
+				{
+					MessageBox(NULL, _T("无法正常处理用户命令"), _T("处理用户命令失败!"), MB_OK | MB_ICONERROR);
+					break;
+				}
+            }
         }
     }
     else
