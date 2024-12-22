@@ -9,9 +9,13 @@ class CPacket
 public:
 	CPacket();
 	CPacket(const CPacket& other);
+	// parse packet
 	CPacket(const BYTE* pData, size_t& nSize);
+	// construct packet
+	CPacket(DWORD nCmd, const BYTE* pData, size_t nSize);
 	CPacket& operator=(const CPacket& other);
 	~CPacket() {}
+	size_t GetSize() const;
 public:
 	WORD sHead;	// FE FF
 	DWORD nLength; // packet length
@@ -29,6 +33,7 @@ public:
 	BOOL AcceptClient();
 	int DealCommand();
 	BOOL Send(const char* pData, size_t nSize);
+	BOOL Send(const CPacket &packet);
 private:
 	// Initialize before main
 	// Singleton, private all constructors

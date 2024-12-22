@@ -177,12 +177,16 @@ int CServerSocket::DealCommand()
 
 BOOL CServerSocket::Send(const char* pData, size_t nSize)
 {
-	if (send(m_client, pData, int(nSize), 0) == SOCKET_ERROR)
-	{
-		return FALSE;
-	}
-	return TRUE;
+	if (m_client == INVALID_SOCKET) return FALSE;
+	return send(m_client, pData, nSize, 0) != SOCKET_ERROR;
 }
+
+BOOL CServerSocket::Send(const CPacket& packet)
+{
+	if (m_client == INVALID_SOCKET) return FALSE;
+	return send(m_client, (const char *)&packet, packet.GetSize(), 0) != SOCKET_ERROR;
+}
+
 
 CPacket::CPacket()
 	: sHead(0)
@@ -236,7 +240,7 @@ CPacket::CPacket(const BYTE* pData, size_t& nSize)
 	WORD sum = 0;
 	for (size_t j = 0; j < strData.size(); j++)
 	{
-		sum += BYTE(strData[i]); // &0xFF
+		sum += BYTE(strData[j]); // &0xFF
 	}
 	if (sum != sSum)
 	{
@@ -268,4 +272,23 @@ CPacket& CPacket::operator=(const CPacket &other)
 		sSum = other.sSum;
 	}
 	return *this;
+}
+
+CPacket::CPacket(DWORD nCmd, const BYTE* pData, size_t nSize)
+{
+	sHead = PACKET_HEAD;
+	nLength = nSize + sizeof(sCmd) + sizeof(sSum);
+	sCmd = nCmd;
+	strData.resize(nSize);
+	memcpy((void*)strData.c_str(), pData, nSize);
+	sSum = 0;
+	for (size_t i = 0; i < strData.size(); i++)
+	{
+		sSum += BYTE(strData[i]);
+	}
+}
+
+size_t CPacket::GetSize() const
+{
+	return sizeof(sHead) + nLength + sizeof(sCmd) + sizeof(sSum);
 }

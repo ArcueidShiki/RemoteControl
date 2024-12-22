@@ -5,6 +5,7 @@
 #include "framework.h"
 #include "RemoteCtrl.h"
 #include "ServerSocket.h"
+#include <direct.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -24,6 +25,32 @@ CWinApp theApp;
 
 using namespace std;
 
+void Dump(BYTE *pData, size_t nSize)
+{
+    std::string strOut;
+    for (size_t i = 0; i < nSize; i++)
+    {
+        char buf[8] = "";
+        snprintf(buf, sizeof(buf), "%02X", pData[i]);
+    }
+}
+
+std::string MakeDriverInfo()
+{
+    std::string result;
+    // 1 == A, 2 == B, 3 == C, 26 == Z
+    for (int i = 1; i <= 26; i++)
+    {
+        if (_chdrive(i) == 0)
+        {
+            if (result.size() > 0)
+                result += ',';
+            result += 'A' + i - 1;
+        }
+    }
+    CServerSocket::GetInstance()->Send(CPacket(1, (BYTE *)result.c_str(), result.size()));
+}
+
 int main()
 {
     int nRetCode = 0;
@@ -41,6 +68,7 @@ int main()
         }
         else
         {
+#if 0
             // global variable, only one instance
             CServerSocket* pServer = CServerSocket::GetInstance();
             int count = 0;
@@ -59,6 +87,8 @@ int main()
 
 				int ret = pServer->DealCommand();
             }
+#endif
+            MakeDriverInfo();
         }
     }
     else
