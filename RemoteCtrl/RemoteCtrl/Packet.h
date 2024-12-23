@@ -8,6 +8,7 @@
 #define CMD_RUN_FILE 3
 #define CMD_DLD_FILE 4
 #define CMD_MOUSE 5
+#define CMD_SEND_SCREEN 6
 
 class CPacket
 {

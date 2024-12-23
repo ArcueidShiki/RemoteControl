@@ -7,6 +7,7 @@
 #include "ServerSocket.h"
 #include <direct.h>
 #include <io.h>
+#include <atlimage.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -252,6 +253,47 @@ int MouseEvent()
     return 0;
 }
 
+int SendScreen()
+{
+    CImage screen; // GDI: Global Device Interface
+    HDC hScreen = ::GetDC(NULL); // device context
+    int bBitPerPixel = GetDeviceCaps(hScreen, BITSPIXEL);// rgba 8888 32bit, rgb565 24 bit, rgb444
+    int nWidth = GetDeviceCaps(hScreen, HORZRES);
+    int nHeight = GetDeviceCaps(hScreen, VERTRES);
+	screen.Create(nWidth, nHeight, bBitPerPixel);
+    BitBlt(screen.GetDC(), 0, 0, nWidth, nHeight, hScreen, 0, 0, SRCCOPY);
+    ReleaseDC(NULL, hScreen);
+#if 0
+    DWORD tick = GetTickCount64();
+    screen.Save(_T("test2024.png"), Gdiplus::ImageFormatPNG);
+    TRACE("PNG: %d\n", GetTickCount64() - tick);
+	tick = GetTickCount64();
+    screen.Save(_T("test2024.jpg"), Gdiplus::ImageFormatJPEG);
+    TRACE("JPG: %d\n", GetTickCount64() - tick);
+#endif
+    HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
+    if (hMem == NULL) return -1;
+    IStream* pStream = NULL;
+    HRESULT ret = CreateStreamOnHGlobal(hMem, TRUE, &pStream);
+	if (ret != S_OK)
+	{
+		screen.ReleaseDC();
+		return -1;
+	}
+    screen.Save(pStream, Gdiplus::ImageFormatJPEG);
+	LARGE_INTEGER li = { 0 };
+    pStream->Seek(li, STREAM_SEEK_SET, NULL);
+    PBYTE pData = (PBYTE)GlobalLock(hMem);
+    SIZE_T nSize = GlobalSize(hMem);
+    CPacket packet(CMD_SEND_SCREEN, pData, nSize);
+    CServerSocket::GetInstance()->Send(packet);
+    GlobalUnlock(hMem);
+    pStream->Release();
+	GlobalFree(hMem);
+    screen.ReleaseDC();
+	return 0;
+}
+
 int main()
 {
     int nRetCode = 0;
@@ -289,26 +331,16 @@ int main()
 				int ret = pServer->DealCommand();
             }
 #endif
-            int nCmd = 1;
+            int nCmd = CMD_SEND_SCREEN;
             switch (nCmd)
             {
-                case CMD_DRIVER:
-				    MakeDriverInfo();
-				    break;
-                case CMD_DIR:
-                    MakeDirectoryInfo();
-                    break;
-                case CMD_RUN_FILE:
-					RunFile();
-					break;
-                case CMD_DLD_FILE:
-                    DownloadFile();
-                    break;
-                case CMD_MOUSE:
-                    MouseEvent();
-                    break;
-                default:
-                    break;
+                case CMD_DRIVER:MakeDriverInfo();break;
+                case CMD_DIR:MakeDirectoryInfo();break;
+                case CMD_RUN_FILE:RunFile();break;
+                case CMD_DLD_FILE:DownloadFile();break;
+                case CMD_MOUSE:MouseEvent();break;
+                case CMD_SEND_SCREEN:SendScreen();break;
+                default:break;
             }
         }
     }
