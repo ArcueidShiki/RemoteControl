@@ -6,6 +6,7 @@
 #include "RemoteCtrl.h"
 #include "ServerSocket.h"
 #include <direct.h>
+#include <io.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -57,11 +58,70 @@ int MakeDriverInfo()
     }
 
     // sCmd, data "C,D,E"
-    CPacket packet(1, (BYTE*)result.c_str(), result.size());
+    CPacket packet(CMD_DRIVER, (BYTE*)result.c_str(), result.size());
     // FF FE(head) 09 00 00 00(length = datasize + cmd+sum) 01 00(cnd) 43 2C 44 2C 45(C(43),D(44),E(45)) 24 01(01 24 = 43 + 2C + 44 + 2C + 45)
     Dump((BYTE*)packet.Data(), packet.Size());
 
 	//CServerSocket::GetInstance()->Send(packet);
+    return 0;
+}
+
+typedef struct file_info{
+    file_info() {
+        IsValid = TRUE;
+        IsDirectory = FALSE;
+        HasNext = TRUE;
+        memset(szFileName, 0, sizeof(szFileName));
+    }
+    BOOL IsValid;
+    BOOL IsDirectory;
+    BOOL HasNext;
+    char szFileName[256];
+} FILEINFO, *PFILEINFO;
+
+/**
+* Lookup directories
+*/
+int MakeDirectoryInfo()
+{
+    std::string strPath;
+    if (!CServerSocket::GetInstance()->GetFilePath(strPath))
+    {
+		OutputDebugString(_T("GetFilePath failed, Current cmd is not get file list, parse failed!!!\n"));
+        return -1;
+    }
+    if (_chdir(strPath.c_str()) != 0)
+    {
+        FILEINFO finfo;
+		finfo.IsDirectory = TRUE;
+        finfo.IsValid = FALSE;
+		finfo.HasNext = FALSE;
+        memcpy(finfo.szFileName, strPath.c_str(), strPath.size());
+		OutputDebugString(_T("No permission to access the directory\n"));
+        CPacket packet(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
+        CServerSocket::GetInstance()->Send(packet);
+        return -2;
+    }
+    _finddata_t fdata;
+    int hfind = 0;
+    if ((hfind = _findfirst("*", &fdata)) == -1 )
+    {
+		OutputDebugString(_T("No files in the directory\n"));
+		return -3;
+    }
+    do {
+        FILEINFO finfo;
+        finfo.IsDirectory = fdata.attrib & _A_SUBDIR;
+        memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
+        CPacket packet(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
+        CServerSocket::GetInstance()->Send(packet);
+    } while (!_findnext(hfind, &fdata));
+    // when tmpfiles or logfiles, are huge, so send one file every time read.
+    // tell client, end.
+    FILEINFO finfo;
+    finfo.HasNext = FALSE;
+    CPacket packet(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
+    CServerSocket::GetInstance()->Send(packet);
     return 0;
 }
 
@@ -105,9 +165,12 @@ int main()
             int nCmd = 1;
             switch (nCmd)
             {
-                case 1:
+                case CMD_DRIVER:
 				    MakeDriverInfo();
 				    break;
+                case CMD_DIR:
+                    MakeDirectoryInfo();
+                    break;
                 default:
                     break;
             }
