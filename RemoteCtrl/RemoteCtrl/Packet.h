@@ -9,6 +9,8 @@
 #define CMD_DLD_FILE 4
 #define CMD_MOUSE 5
 #define CMD_SEND_SCREEN 6
+#define CMD_LOCK_MACHINE 7
+#define CMD_UNLOCK_MACHINE 8
 
 class CPacket
 {

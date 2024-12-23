@@ -5,6 +5,7 @@
 #include "framework.h"
 #include "RemoteCtrl.h"
 #include "ServerSocket.h"
+#include "LockDialog.h"
 #include <direct.h>
 #include <io.h>
 #include <atlimage.h>
@@ -20,6 +21,7 @@
 #pragma comment(linker, "/subsystem:console /entry:mainCRTStartup")
 #endif
 
+CLockDialog dlg;
 
 // The one and only application object
 
@@ -294,6 +296,40 @@ int SendScreen()
 	return 0;
 }
 
+int LockMachine()
+{
+#if 1
+    // non modal dlg: can handle other window
+    dlg.Create(IDD_DIALOG_INFO, NULL);
+    dlg.ShowWindow(SW_SHOW);
+    dlg.SetWindowPos(&dlg.wndNoTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0))
+    {
+        TranslateMessage(&msg);
+		DispatchMessage(&msg);
+        if (msg.message == WM_KEYDOWN)
+        {
+            TRACE("msg:%08X, wparam:%08X, lparam:%08X\r\n", msg.message, msg.wParam, msg.lParam);
+            if (msg.wParam == VK_ESCAPE) // ESC
+                break;
+        }
+    }
+    dlg.DestroyWindow();
+#endif
+
+#if 0
+    // modal dlg: can not handle other window.
+    dlg.DoModal();
+#endif
+    return 0;
+}
+
+int UnlockMachine()
+{
+    return 0;
+}
+
 int main()
 {
     int nRetCode = 0;
@@ -331,7 +367,7 @@ int main()
 				int ret = pServer->DealCommand();
             }
 #endif
-            int nCmd = CMD_SEND_SCREEN;
+            int nCmd = CMD_LOCK_MACHINE;
             switch (nCmd)
             {
                 case CMD_DRIVER:MakeDriverInfo();break;
@@ -340,6 +376,8 @@ int main()
                 case CMD_DLD_FILE:DownloadFile();break;
                 case CMD_MOUSE:MouseEvent();break;
                 case CMD_SEND_SCREEN:SendScreen();break;
+                case CMD_LOCK_MACHINE:LockMachine();break;
+                case CMD_UNLOCK_MACHINE: UnlockMachine();break;
                 default:break;
             }
         }
