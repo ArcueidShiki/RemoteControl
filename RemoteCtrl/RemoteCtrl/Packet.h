@@ -5,6 +5,8 @@
 #define PACKET_HEAD 0xFEFF
 #define CMD_DRIVER 1
 #define CMD_DIR 2
+#define CMD_RUN_FILE 3
+#define CMD_DLD_FILE 4
 
 class CPacket
 {

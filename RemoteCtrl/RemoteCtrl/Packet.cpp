@@ -92,8 +92,15 @@ CPacket::CPacket(DWORD nCmd, const BYTE* pData, size_t nSize)
 	sHead = PACKET_HEAD;
 	nLength = nSize + sizeof(sCmd) + sizeof(sSum);
 	sCmd = nCmd;
-	strData.resize(nSize);
-	memcpy((void*)strData.c_str(), pData, nSize);
+	if (nSize > 0 && pData)
+	{
+		strData.resize(nSize);
+		memcpy((void*)strData.c_str(), pData, nSize);
+	}
+	else
+	{
+		strData.clear();
+	}
 	sSum = 0;
 	for (size_t i = 0; i < strData.size(); i++)
 	{

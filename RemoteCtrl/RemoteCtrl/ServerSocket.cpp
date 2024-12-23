@@ -189,7 +189,8 @@ BOOL CServerSocket::Send(CPacket& packet)
 
 BOOL CServerSocket::GetFilePath(std::string& strPath)
 {
-	if (m_packet.sCmd == CMD_DIR)
+	if (m_packet.sCmd == CMD_DIR || m_packet.sCmd == CMD_RUN_FILE
+		|| m_packet.sCmd == CMD_DLD_FILE)
 	{
 		strPath = m_packet.strData;
 		return TRUE;

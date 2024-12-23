@@ -125,6 +125,50 @@ int MakeDirectoryInfo()
     return 0;
 }
 
+int RunFile()
+{
+    std::string strPath;
+    CServerSocket::GetInstance()->GetFilePath(strPath);
+    // open / run file.
+    ShellExecuteA(NULL, NULL, strPath.c_str(), NULL, NULL, SW_SHOWNORMAL);
+    CPacket packet(CMD_RUN_FILE, NULL, 0);
+    CServerSocket::GetInstance()->Send(packet);
+    return 0;
+}
+
+int DownloadFile()
+{
+#define DLD_BUF_SIZE 1024 // local scope macro, is not accessible globally.
+    std::string strPath;
+    CServerSocket::GetInstance()->GetFilePath(strPath);
+    FILE* pFile = NULL;
+	// if you open first, then, other process open this in exclusive mode, you have the pointer, but cannot do anything.
+    // Or property->C/C++->preprocessor->_CRT_SECURE_NO_WARNINGS
+    // Or #pragma warning(disable:4996)
+    errno_t err = fopen_s(&pFile, strPath.c_str(), "rb");
+    if (!pFile || err != 0)
+    {
+		CPacket packet(CMD_DLD_FILE, NULL, 0);
+		CServerSocket::GetInstance()->Send(packet);
+		return -1;
+    }
+    fseek(pFile, 0, SEEK_END);
+    long long data = _ftelli64(pFile);
+    CPacket head(CMD_DLD_FILE, (BYTE*)&data, sizeof(data));
+    fseek(pFile, 0, SEEK_SET);
+    char buf[DLD_BUF_SIZE] = "";
+    size_t rlen = 0;
+    do {
+        rlen = fread(buf, 1, DLD_BUF_SIZE, pFile);
+        CPacket packet(CMD_DLD_FILE, (BYTE*)buf, rlen);
+        CServerSocket::GetInstance()->Send(packet);
+	} while (rlen >= DLD_BUF_SIZE);
+    CPacket packet(CMD_DLD_FILE, NULL, 0);
+    CServerSocket::GetInstance()->Send(packet);
+    fclose(pFile);
+	return 0;
+}
+
 int main()
 {
     int nRetCode = 0;
@@ -170,6 +214,12 @@ int main()
 				    break;
                 case CMD_DIR:
                     MakeDirectoryInfo();
+                    break;
+                case CMD_RUN_FILE:
+					RunFile();
+					break;
+                case CMD_DLD_FILE:
+                    DownloadFile();
                     break;
                 default:
                     break;
