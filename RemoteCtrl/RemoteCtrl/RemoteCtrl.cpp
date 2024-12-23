@@ -67,7 +67,8 @@ int MakeDriverInfo()
 }
 
 typedef struct file_info{
-    file_info() {
+    file_info()
+    {
         IsValid = TRUE;
         IsDirectory = FALSE;
         HasNext = TRUE;
@@ -169,6 +170,88 @@ int DownloadFile()
 	return 0;
 }
 
+int MouseEvent()
+{
+#define MOVE 0x00
+#define LEFT 0x01
+#define RIGHT 0x02
+#define MIDDLE 0x04
+#define CLICK 0x08
+#define DBCLICK 0x10
+#define DOWN 0x20
+#define UP 0x40
+
+    MOUSEEV mouse;
+    if (CServerSocket::GetInstance()->GetMouseEvent(mouse))
+    {
+        DWORD operation = mouse.nButton;
+        if (operation != MOVE)
+			SetCursorPos(mouse.point.x, mouse.point.y);
+        operation |= mouse.nAction;
+        switch (operation)
+        {
+		    case LEFT | CLICK:
+			    mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
+			    mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
+			    break;
+		    case LEFT | DBCLICK:
+                mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
+                mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
+                mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
+                mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
+			    break;
+		    case LEFT | DOWN:
+			    mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
+			    break;
+		    case LEFT | UP:
+			    mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
+			    break;
+		    case RIGHT | CLICK:
+			    mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
+			    mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
+			    break;
+		    case RIGHT | DBCLICK:
+			    mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
+			    mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
+			    mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
+			    mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
+			    break;
+		    case RIGHT | DOWN:
+			    mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
+			    break;
+		    case RIGHT | UP:
+			    mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
+			    break;
+		    case MIDDLE | CLICK:
+			    mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
+			    mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
+			    break;
+		    case MIDDLE | DBCLICK:
+			    mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
+			    mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
+			    mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
+			    mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
+			    break;
+		    case MIDDLE | DOWN:
+			    mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
+			    break;
+		    case MIDDLE | UP:
+			    mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
+			    break;
+		    case MOVE:
+				mouse_event(MOUSEEVENTF_MOVE, mouse.point.x, mouse.point.y, 0, GetMessageExtraInfo());
+        }
+        CPacket packet(CMD_MOUSE, NULL, 0);
+        CServerSocket::GetInstance()->Send(packet);
+    }
+    else
+    {
+		OutputDebugString(_T("GetMouseEvent failed, Current cmd is not mouse event, parse failed!!!\n"));
+        return -1;
+    }
+    return 0;
+}
+
 int main()
 {
     int nRetCode = 0;
@@ -220,6 +303,9 @@ int main()
 					break;
                 case CMD_DLD_FILE:
                     DownloadFile();
+                    break;
+                case CMD_MOUSE:
+                    MouseEvent();
                     break;
                 default:
                     break;

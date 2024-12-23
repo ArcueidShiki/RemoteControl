@@ -197,3 +197,16 @@ BOOL CServerSocket::GetFilePath(std::string& strPath)
 	}
 	return FALSE;
 }
+
+/**
+* Mouse event: move, right click, left click, double click
+*/
+BOOL CServerSocket::GetMouseEvent(MOUSEEV& mouse)
+{
+	if (m_packet.sCmd == CMD_MOUSE)
+	{
+		memcpy(&mouse, m_packet.strData.c_str(), sizeof(MOUSEEV));
+		return TRUE;
+	}
+	return FALSE;
+}

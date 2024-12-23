@@ -3,6 +3,19 @@
 #include "framework.h"
 #include "Packet.h"
 
+typedef struct MouseEvent{
+	MouseEvent()
+	{
+		nAction = 0;
+		nButton = -1;
+		point.x = 0;
+		point.y = 0;
+	}
+	WORD nAction; // move, click, double click
+	WORD nButton; // left, middle, right
+	POINT point;
+} MOUSEEV, *PMOUSEEV;
+
 class CServerSocket
 {
 public:
@@ -14,6 +27,7 @@ public:
 	BOOL Send(const char* pData, size_t nSize);
 	BOOL Send(CPacket &packet);
 	BOOL GetFilePath(std::string& strPath);
+	BOOL GetMouseEvent(MOUSEEV &mouse);
 private:
 	// Initialize before main
 	// Singleton, private all constructors
