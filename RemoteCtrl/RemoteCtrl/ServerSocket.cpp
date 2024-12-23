@@ -20,7 +20,7 @@ CServerSocket::CServerSocket()
 		MessageBox(NULL, _T("无法初始化套接字，请检查网络设置"), _T("初始化错误!"), MB_OK | MB_ICONERROR);
 		exit(0);
 	}
-	MessageBox(NULL, _T("初始化套接字成功"), _T("1111111111"), MB_OK | MB_ICONERROR);
+	//MessageBox(NULL, _T("初始化套接字成功"), _T("1111111111"), MB_OK | MB_ICONERROR);
 }
 
 CServerSocket::CServerSocket(const CServerSocket& other)
@@ -177,95 +177,23 @@ int CServerSocket::DealCommand()
 
 BOOL CServerSocket::Send(const char* pData, size_t nSize)
 {
-	if (send(m_client, pData, int(nSize), 0) == SOCKET_ERROR)
-	{
-		return FALSE;
-	}
-	return TRUE;
+	if (m_client == INVALID_SOCKET) return FALSE;
+	return send(m_client, pData, nSize, 0) != SOCKET_ERROR;
 }
 
-CPacket::CPacket()
-	: sHead(0)
-	, nLength(0)
-	, sCmd(0)
-	, sSum(0)
+BOOL CServerSocket::Send(CPacket& packet)
 {
+	if (m_client == INVALID_SOCKET) return FALSE;
+	return send(m_client, packet.Data(), packet.Size(), 0) != SOCKET_ERROR;
 }
 
-CPacket::CPacket(const BYTE* pData, size_t& nSize)
+BOOL CServerSocket::GetFilePath(std::string& strPath)
 {
-	// head
-	size_t i = 0;
-	for (; i < nSize; i++)
+	if (m_packet.sCmd == CMD_DIR || m_packet.sCmd == CMD_RUN_FILE
+		|| m_packet.sCmd == CMD_DLD_FILE)
 	{
-		if (*(WORD*)(pData + i) == PACKET_HEAD)
-		{
-			sHead += PACKET_HEAD;
-			i += sizeof(sHead); // skip head
-			break;
-		}
+		strPath = m_packet.strData;
+		return TRUE;
 	}
-
-	// length			length + cmd + sum
-	if (i + sizeof(nLength) + sizeof(sCmd) + sizeof(sSum) > nSize)
-	{
-		nSize = 0;
-		return; // parse packet error.
-	}
-	nLength = *(DWORD*)(pData + i);
-	i += sizeof(nLength);
-
-	// cmd
-	if (nLength + i > nSize)
-	{
-		// message is not received completely, its larger than the packet
-		nSize = 0;
-		return;
-	}
-	sCmd = *(WORD*)(pData + i);
-	i += sizeof(sCmd);
-
-	// str data
-	DWORD dataLen = nLength - sizeof(sCmd) - sizeof(sSum);
-	strData.resize(dataLen);
-	memcpy((void*)strData.c_str(), pData + i, dataLen);
-	i += dataLen;
-
-	// check sum
-	sSum = *(WORD*)(pData + i);
-	WORD sum = 0;
-	for (size_t j = 0; j < strData.size(); j++)
-	{
-		sum += BYTE(strData[i]); // &0xFF
-	}
-	if (sum != sSum)
-	{
-		nSize = 0;
-		return;
-	}
-	i += sizeof(sSum);
-	// parse packet success.
-	nSize = i; // head length data
-}
-
-CPacket::CPacket(const CPacket &other)
-{
-	sHead = other.sHead;
-	nLength = other.nLength;
-	sCmd = other.sCmd;
-	strData = other.strData;
-	sSum = other.sSum;
-}
-
-CPacket& CPacket::operator=(const CPacket &other)
-{
-	if (this != &other)
-	{
-		sHead = other.sHead;
-		nLength = other.nLength;
-		sCmd = other.sCmd;
-		strData = other.strData;
-		sSum = other.sSum;
-	}
-	return *this;
+	return FALSE;
 }

@@ -1,24 +1,7 @@
 #pragma once
 #include "pch.h"
 #include "framework.h"
-
-#define PACKET_HEAD 0xFEFF
-
-class CPacket
-{
-public:
-	CPacket();
-	CPacket(const CPacket& other);
-	CPacket(const BYTE* pData, size_t& nSize);
-	CPacket& operator=(const CPacket& other);
-	~CPacket() {}
-public:
-	WORD sHead;	// FE FF
-	DWORD nLength; // packet length
-	WORD sCmd; // conctrol command
-	std::string strData;
-	WORD sSum; // check sum / crc
-};
+#include "Packet.h"
 
 class CServerSocket
 {
@@ -29,6 +12,8 @@ public:
 	BOOL AcceptClient();
 	int DealCommand();
 	BOOL Send(const char* pData, size_t nSize);
+	BOOL Send(CPacket &packet);
+	BOOL GetFilePath(std::string& strPath);
 private:
 	// Initialize before main
 	// Singleton, private all constructors
