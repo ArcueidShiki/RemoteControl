@@ -20,7 +20,7 @@ CServerSocket::CServerSocket()
 		MessageBox(NULL, _T("无法初始化套接字，请检查网络设置"), _T("初始化错误!"), MB_OK | MB_ICONERROR);
 		exit(0);
 	}
-	MessageBox(NULL, _T("初始化套接字成功"), _T("1111111111"), MB_OK | MB_ICONERROR);
+	//MessageBox(NULL, _T("初始化套接字成功"), _T("1111111111"), MB_OK | MB_ICONERROR);
 }
 
 CServerSocket::CServerSocket(const CServerSocket& other)
@@ -181,12 +181,11 @@ BOOL CServerSocket::Send(const char* pData, size_t nSize)
 	return send(m_client, pData, nSize, 0) != SOCKET_ERROR;
 }
 
-BOOL CServerSocket::Send(const CPacket& packet)
+BOOL CServerSocket::Send(CPacket& packet)
 {
 	if (m_client == INVALID_SOCKET) return FALSE;
-	return send(m_client, (const char *)&packet, packet.GetSize(), 0) != SOCKET_ERROR;
+	return send(m_client, packet.Data(), packet.Size(), 0) != SOCKET_ERROR;
 }
-
 
 CPacket::CPacket()
 	: sHead(0)
@@ -288,7 +287,23 @@ CPacket::CPacket(DWORD nCmd, const BYTE* pData, size_t nSize)
 	}
 }
 
-size_t CPacket::GetSize() const
+size_t CPacket::Size() const
 {
 	return sizeof(sHead) + nLength + sizeof(sCmd) + sizeof(sSum);
+}
+
+const char* CPacket::Data()
+{
+	strOut.resize(Size());
+	BYTE* pData = (BYTE*)strOut.c_str();
+	*(WORD*)pData = sHead;
+	pData += sizeof(sHead);
+	*(DWORD*)(pData) = nLength;
+	pData += sizeof(nLength);
+	*(WORD*)(pData) = sCmd;
+	pData += sizeof(sCmd);
+	memcpy(pData, strData.c_str(), strData.size());
+	pData += strData.size();
+	*(WORD*)pData = sSum;
+	return strOut.c_str();
 }

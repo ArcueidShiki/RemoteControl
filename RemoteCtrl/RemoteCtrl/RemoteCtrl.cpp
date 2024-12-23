@@ -31,11 +31,18 @@ void Dump(BYTE *pData, size_t nSize)
     for (size_t i = 0; i < nSize; i++)
     {
         char buf[8] = "";
-        snprintf(buf, sizeof(buf), "%02X", pData[i]);
+        if (i > 0 && (i % 16 == 0)) strOut += '\n';
+        snprintf(buf, sizeof(buf), "%02X ", pData[i]);
+        strOut += buf;
     }
+	strOut += '\n';
+    OutputDebugStringA(strOut.c_str());
 }
 
-std::string MakeDriverInfo()
+/**
+* Lookup files, need driver partitions
+*/
+int MakeDriverInfo()
 {
     std::string result;
     // 1 == A, 2 == B, 3 == C, 26 == Z
@@ -48,7 +55,14 @@ std::string MakeDriverInfo()
             result += 'A' + i - 1;
         }
     }
-    CServerSocket::GetInstance()->Send(CPacket(1, (BYTE *)result.c_str(), result.size()));
+
+    // sCmd, data "C,D,E"
+    CPacket packet(1, (BYTE*)result.c_str(), result.size());
+    // FF FE(head) 09 00 00 00(length = datasize + cmd+sum) 01 00(cnd) 43 2C 44 2C 45(C(43),D(44),E(45)) 24 01(01 24 = 43 + 2C + 44 + 2C + 45)
+    Dump((BYTE*)packet.Data(), packet.Size());
+
+	//CServerSocket::GetInstance()->Send(packet);
+    return 0;
 }
 
 int main()
@@ -88,7 +102,15 @@ int main()
 				int ret = pServer->DealCommand();
             }
 #endif
-            MakeDriverInfo();
+            int nCmd = 1;
+            switch (nCmd)
+            {
+                case 1:
+				    MakeDriverInfo();
+				    break;
+                default:
+                    break;
+            }
         }
     }
     else
