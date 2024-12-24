@@ -148,7 +148,7 @@ int CClientSocket::DealCommand()
 	// 3~4 byte: package length
 	// 5~n-2 byte: package data
 	// n-1~n byte: package check: md5checksum, crc16, crc32
-	int BUF_SIZE = 4096;
+#define BUF_SIZE 4096
 	char* buf = new char[BUF_SIZE];
 	memset(buf, 0, BUF_SIZE);
 	size_t index = 0;
@@ -173,7 +173,6 @@ int CClientSocket::DealCommand()
 			return m_packet.sCmd;
 		}
 	}
-	delete[] buf;
 	return -1;
 }
 
