@@ -22,6 +22,7 @@
 #endif
 
 CLockDialog dlg;
+unsigned tid = 0;
 
 // The one and only application object
 
@@ -296,25 +297,41 @@ int SendScreen()
 	return 0;
 }
 
-int LockMachine()
+unsigned __stdcall ThreadLockDlg(void* arg)
 {
+    TRACE("%s (%d):%d\n", __FUNCTION__, __LINE__, GetCurrentThreadId());
+    ShowCursor(FALSE);
+    ::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_HIDE);
 #if 1
     // non modal dlg: can handle other window
     dlg.Create(IDD_DIALOG_INFO, NULL);
     dlg.ShowWindow(SW_SHOW);
     dlg.SetWindowPos(&dlg.wndNoTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+    CRect rect;
+    rect.left = 0;
+    rect.top = 0;
+    rect.right = GetSystemMetrics(SM_CXSCREEN); // same as GetDeviceCaps( hdcPrimaryMonitor, HORZRES)
+    rect.bottom = GetSystemMetrics(SM_CYSCREEN) - 40; // same as GetDeviceCaps( hdcPrimaryMonitor, VERTRES)
+    TRACE("right = %d, bottom = %d\n", rect.right, rect.bottom);
+    dlg.MoveWindow(&rect);
+    //dlg.GetWindowRect(&rect);
+    ClipCursor(&rect); // restrict mouse move range.
     MSG msg;
+    // bind to current thread, only can get message from this thread
     while (GetMessage(&msg, NULL, 0, 0))
     {
         TranslateMessage(&msg);
-		DispatchMessage(&msg);
+        DispatchMessage(&msg);
         if (msg.message == WM_KEYDOWN)
         {
             TRACE("msg:%08X, wparam:%08X, lparam:%08X\r\n", msg.message, msg.wParam, msg.lParam);
             if (msg.wParam == VK_ESCAPE) // ESC
+            {
                 break;
+            }
         }
     }
+    ::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_SHOW);
     dlg.DestroyWindow();
 #endif
 
@@ -322,11 +339,33 @@ int LockMachine()
     // modal dlg: can not handle other window.
     dlg.DoModal();
 #endif
+    ShowCursor(TRUE);
+    // hide task bar
+    _endthreadex(0);
+    return 0;
+}
+
+int LockMachine()
+{
+    if (dlg.m_hWnd == NULL || dlg.m_hWnd == INVALID_HANDLE_VALUE)
+    {
+		// create a thread to show dialog
+        //_beginthread(ThreadLockDlg, 0, NULL);
+        _beginthreadex(NULL, 0, ThreadLockDlg, NULL, 0, &tid);
+        TRACE("Thread id = %u\n", tid);
+    }
+    CPacket packet(CMD_UNLOCK_MACHINE, NULL, 0);
+    CServerSocket::GetInstance()->Send(packet);
     return 0;
 }
 
 int UnlockMachine()
 {
+	// simulate press ESC
+	PostThreadMessage(tid, WM_KEYDOWN, VK_ESCAPE, 0x00010001);
+    // send back to client
+    CPacket packet(CMD_UNLOCK_MACHINE, NULL, 0);
+    CServerSocket::GetInstance()->Send(packet);
     return 0;
 }
 
@@ -380,6 +419,14 @@ int main()
                 case CMD_UNLOCK_MACHINE: UnlockMachine();break;
                 default:break;
             }
+            Sleep(2000);
+            UnlockMachine();
+            while (dlg.m_hWnd != NULL)
+            {
+                // otherwise, you create a dlg in another thread, but when main exit, will call deconstructor of global variable, will cause issue.
+                Sleep(10);
+            }
+            TRACE("dlg.m_hWnd = %08X\n", dlg.m_hWnd); // NULL 0
         }
     }
     else
