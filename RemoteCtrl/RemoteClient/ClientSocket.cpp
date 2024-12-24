@@ -1,61 +1,57 @@
 #include "pch.h"
-#include "ServerSocket.h"
+#include "ClientSocket.h"
 
 //define and init static member outside class
-CServerSocket* CServerSocket::m_instance = NULL;
+CClientSocket* CClientSocket::m_instance = NULL;
 // help trigger delete deconstructor
-CServerSocket::CHelper CServerSocket::m_helper;
+CClientSocket::CHelper CClientSocket::m_helper;
 
-CServerSocket::CServerSocket()
-	: m_client(INVALID_SOCKET)
-	, m_socket(INVALID_SOCKET)
+CClientSocket::CClientSocket()
+	: m_socket(INVALID_SOCKET)
 {
 	if (!InitSocketEnv())
 	{
 		MessageBox(NULL, _T("Cannot Initiate socket environment, please check network setting!"), _T("Soccket Initialization Error!"), MB_OK | MB_ICONERROR);
 		exit(0);
 	}
-	if (!InitSocket())
+	if (!InitSocket("127.0.0.1"))
 	{
 		MessageBox(NULL, _T("Cannot Initiate socket, please check network setting!"), _T("Soccket Initialization Error!"), MB_OK | MB_ICONERROR);
 		exit(0);
 	}
-	//MessageBox(NULL, _T("初始化套接字成功"), _T("1111111111"), MB_OK | MB_ICONERROR);
 }
 
-CServerSocket::CServerSocket(const CServerSocket& other)
-{
+CClientSocket::CClientSocket(const CClientSocket& other)
+{ 
 	m_socket = other.m_socket;
-	m_client = other.m_client;
 }
 
-CServerSocket& CServerSocket::operator=(const CServerSocket& other)
+CClientSocket& CClientSocket::operator=(const CClientSocket& other)
 {
 	if (this != &other)
 	{
 		m_socket = other.m_socket;
-		m_client = other.m_client;
 	}
 	return *this;
 }
 
-CServerSocket::~CServerSocket()
+CClientSocket::~CClientSocket()
 {
 	closesocket(m_socket);
 	WSACleanup();
 }
 
-CServerSocket* CServerSocket::GetInstance()
+CClientSocket* CClientSocket::GetInstance()
 {
 	if (m_instance == NULL)
 	{
 		// need explicitly delete to trigger deconstructor
-		m_instance = new CServerSocket();
+		m_instance = new CClientSocket();
 	}
 	return m_instance;
 }
 
-void CServerSocket::ReleaseInstance()
+void CClientSocket::ReleaseInstance()
 {
 	if (m_instance != NULL)
 	{
@@ -64,17 +60,17 @@ void CServerSocket::ReleaseInstance()
 	}
 }
 
-CServerSocket::CHelper::CHelper()
+CClientSocket::CHelper::CHelper()
 {
-	CServerSocket::GetInstance();
+	CClientSocket::GetInstance();
 }
 
-CServerSocket::CHelper::~CHelper()
+CClientSocket::CHelper::~CHelper()
 {
-	CServerSocket::ReleaseInstance();
+	CClientSocket::ReleaseInstance();
 }
 
-BOOL CServerSocket::InitSocketEnv()
+BOOL CClientSocket::InitSocketEnv()
 {
 	WSAData wsaData;
 	WORD wVersionRequested = MAKEWORD(1, 1);
@@ -92,7 +88,22 @@ BOOL CServerSocket::InitSocketEnv()
 	return TRUE;
 }
 
-BOOL CServerSocket::InitSocket()
+std::string GetErrorInfo(int wsaErrCode)
+{
+	std::string ret;
+	LPVOID lpMsgBuf = NULL;
+	FormatMessage(
+		FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+		NULL,
+		wsaErrCode,
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		(LPTSTR)&lpMsgBuf, 0, NULL);
+	ret = (char*)lpMsgBuf;
+	LocalFree(lpMsgBuf);
+	return ret;
+}
+
+BOOL CClientSocket::InitSocket(const std::string& strIPAddress)
 {
 	if (m_socket != INVALID_SOCKET)
 	{
@@ -107,37 +118,25 @@ BOOL CServerSocket::InitSocket()
 	SOCKADDR_IN serv_addr;
 	memset(&serv_addr, 0, sizeof(serv_addr));
 	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
-	serv_addr.sin_port = htons(10000);
-	if (bind(m_socket, (SOCKADDR*)&serv_addr, sizeof(serv_addr)) == SOCKET_ERROR)
+	serv_addr.sin_addr.S_un.S_addr = inet_addr(strIPAddress.c_str());
+	serv_addr.sin_port = htons(10000);	// default port
+	if (serv_addr.sin_addr.S_un.S_addr == INADDR_NONE)
 	{
-		MessageBox(NULL, _T("Cannot bind socket, please check network setting!"), _T("Socket Bind Error!"), MB_OK | MB_ICONERROR);
+		AfxMessageBox(_T("Invalid IP Address"));
 		return FALSE;
 	}
-	if (listen(m_socket, 1) == SOCKET_ERROR)
+	if (connect(m_socket, (SOCKADDR*)&serv_addr, sizeof(serv_addr)) == SOCKET_ERROR)
 	{
-		MessageBox(NULL, _T("Cannot listen socket, please check network setting!"), _T("Socket Listen Error!"), MB_OK | MB_ICONERROR);
+		AfxMessageBox(_T("Connect Failed"));
+		TRACE("Connect Failed %d %s\n", WSAGetLastError(), GetErrorInfo(WSAGetLastError()).c_str());
 		return FALSE;
 	}
 	return m_socket != INVALID_SOCKET;
 }
 
-BOOL CServerSocket::AcceptClient()
+int CClientSocket::DealCommand()
 {
-	SOCKADDR_IN client_addr;
-	int client_addr_size = sizeof(client_addr);
-	m_client = accept(m_socket, (SOCKADDR*)&client_addr, &client_addr_size);
-	if (m_client == INVALID_SOCKET)
-	{
-		printf("accept failed client: %zu, m_socket：%zu\n", m_client, m_socket);
-		return FALSE;
-	}
-	return TRUE;
-}
-
-int CServerSocket::DealCommand()
-{
-	if (m_client == INVALID_SOCKET)
+	if (m_socket == INVALID_SOCKET)
 	{
 		return -1;
 	}
@@ -155,7 +154,7 @@ int CServerSocket::DealCommand()
 	size_t index = 0;
 	while (TRUE)
 	{
-		size_t len = recv(m_client, buf + index, BUF_SIZE - index, 0);
+		size_t len = recv(m_socket, buf + index, BUF_SIZE - index, 0);
 		if (len <= 0)
 		{
 			return -1;
@@ -175,19 +174,19 @@ int CServerSocket::DealCommand()
 	return -1;
 }
 
-BOOL CServerSocket::Send(const char* pData, size_t nSize)
+BOOL CClientSocket::Send(const char* pData, size_t nSize)
 {
-	if (m_client == INVALID_SOCKET) return FALSE;
-	return send(m_client, pData, nSize, 0) != SOCKET_ERROR;
+	if (m_socket == INVALID_SOCKET) return FALSE;
+	return send(m_socket, pData, nSize, 0) != SOCKET_ERROR;
 }
 
-BOOL CServerSocket::Send(CPacket& packet)
+BOOL CClientSocket::Send(CPacket& packet)
 {
-	if (m_client == INVALID_SOCKET) return FALSE;
-	return send(m_client, packet.Data(), packet.Size(), 0) != SOCKET_ERROR;
+	if (m_socket == INVALID_SOCKET) return FALSE;
+	return send(m_socket, packet.Data(), packet.Size(), 0) != SOCKET_ERROR;
 }
 
-BOOL CServerSocket::GetFilePath(std::string& strPath)
+BOOL CClientSocket::GetFilePath(std::string& strPath)
 {
 	if (m_packet.sCmd == CMD_DIR || m_packet.sCmd == CMD_RUN_FILE
 		|| m_packet.sCmd == CMD_DLD_FILE)
@@ -201,7 +200,7 @@ BOOL CServerSocket::GetFilePath(std::string& strPath)
 /**
 * Mouse event: move, right click, left click, double click
 */
-BOOL CServerSocket::GetMouseEvent(MOUSEEV& mouse)
+BOOL CClientSocket::GetMouseEvent(MOUSEEV& mouse)
 {
 	if (m_packet.sCmd == CMD_MOUSE)
 	{
