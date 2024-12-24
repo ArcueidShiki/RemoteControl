@@ -369,6 +369,23 @@ int UnlockMachine()
     return 0;
 }
 
+int ExecuteCommand(int nCmd)
+{
+    switch (nCmd)
+    {
+        case CMD_DRIVER: return MakeDriverInfo();
+        case CMD_DIR: return MakeDirectoryInfo();
+        case CMD_RUN_FILE: return RunFile();
+        case CMD_DLD_FILE: return DownloadFile();
+        case CMD_MOUSE: return MouseEvent();
+        case CMD_SEND_SCREEN: return SendScreen();
+        case CMD_LOCK_MACHINE:return LockMachine();
+        case CMD_UNLOCK_MACHINE: return UnlockMachine();
+        default:break;
+    }
+    return -1;
+}
+
 int main()
 {
     int nRetCode = 0;
@@ -386,7 +403,7 @@ int main()
         }
         else
         {
-#if 0
+#if 1
             // global variable, only one instance
             CServerSocket* pServer = CServerSocket::GetInstance();
             int count = 0;
@@ -403,30 +420,23 @@ int main()
                     count++;
                 }
 
-				int ret = pServer->DealCommand();
+				int cmd = pServer->DealCommand();
+				if (cmd == -1)
+				{
+					TRACE("Parse Command failed\n");
+					break;
+				}
+                TRACE("Parse Command : %d\n", cmd);
+                int ret = ExecuteCommand(cmd);
+                if (ret != 0)
+                {
+					TRACE("Execute Command failed: cmd = %d, ret = %d\n", cmd, ret);
+                }
+				TRACE("Execute Command : %d, Success\n", cmd);
+                // short connection. FTP usually use long connection
+                pServer->CloseClient();
             }
 #endif
-            int nCmd = CMD_LOCK_MACHINE;
-            switch (nCmd)
-            {
-                case CMD_DRIVER:MakeDriverInfo();break;
-                case CMD_DIR:MakeDirectoryInfo();break;
-                case CMD_RUN_FILE:RunFile();break;
-                case CMD_DLD_FILE:DownloadFile();break;
-                case CMD_MOUSE:MouseEvent();break;
-                case CMD_SEND_SCREEN:SendScreen();break;
-                case CMD_LOCK_MACHINE:LockMachine();break;
-                case CMD_UNLOCK_MACHINE: UnlockMachine();break;
-                default:break;
-            }
-            Sleep(2000);
-            UnlockMachine();
-            while (dlg.m_hWnd != NULL)
-            {
-                // otherwise, you create a dlg in another thread, but when main exit, will call deconstructor of global variable, will cause issue.
-                Sleep(10);
-            }
-            TRACE("dlg.m_hWnd = %08X\n", dlg.m_hWnd); // NULL 0
         }
     }
     else

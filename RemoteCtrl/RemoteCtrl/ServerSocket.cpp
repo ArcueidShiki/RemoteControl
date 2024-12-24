@@ -135,6 +135,9 @@ BOOL CServerSocket::AcceptClient()
 	return TRUE;
 }
 
+/**
+@return cmd
+*/
 int CServerSocket::DealCommand()
 {
 	if (m_client == INVALID_SOCKET)
@@ -209,4 +212,10 @@ BOOL CServerSocket::GetMouseEvent(MOUSEEV& mouse)
 		return TRUE;
 	}
 	return FALSE;
+}
+
+void CServerSocket::CloseClient()
+{
+	closesocket(m_client);
+	m_client = INVALID_SOCKET;
 }
