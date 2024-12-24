@@ -129,7 +129,7 @@ BOOL CServerSocket::AcceptClient()
 	m_client = accept(m_socket, (SOCKADDR*)&client_addr, &client_addr_size);
 	if (m_client == INVALID_SOCKET)
 	{
-		printf("accept failed client: %zu, m_socket£º%zu\n", m_client, m_socket);
+		TRACE("accept failed client: %zu, m_socket£º%zu\n", m_client, m_socket);
 		return FALSE;
 	}
 	return TRUE;
@@ -140,10 +140,6 @@ BOOL CServerSocket::AcceptClient()
 */
 int CServerSocket::DealCommand()
 {
-	if (m_client == INVALID_SOCKET)
-	{
-		return -1;
-	}
 	// tcp no data border
 	// desgin tcp package:
 	// 1. dstinguish different package or leftover
@@ -152,15 +148,26 @@ int CServerSocket::DealCommand()
 	// 3~4 byte: package length
 	// 5~n-2 byte: package data
 	// n-1~n byte: package check: md5checksum, crc16, crc32
-#define BUF_SIZE 4096
+	int BUF_SIZE = 4096;
 	char* buf = new char[BUF_SIZE];
 	memset(buf, 0, BUF_SIZE);
 	size_t index = 0;
 	while (TRUE)
 	{
-		size_t len = recv(m_client, buf + index, BUF_SIZE - index, 0);
-		if (len <= 0)
+		// if client disconnect, during recving msg.
+		if (m_client == INVALID_SOCKET)
 		{
+			TRACE("Client is not connected, waiting for retry");
+			while (!AcceptClient())
+			{
+				Sleep(1000);
+			}
+		}
+		TRACE("Client conncted");
+		size_t len = recv(m_client, buf + index, BUF_SIZE - index, 0);
+		if (len < 0)
+		{
+			delete[] buf;
 			return -1;
 		}
 		index += len;
@@ -172,9 +179,11 @@ int CServerSocket::DealCommand()
 			memmove(buf, buf + len, BUF_SIZE - len);
 			// after moving, the unused spacec for receiving data
 			index -= len;
+			delete[] buf;
 			return m_packet.sCmd;
 		}
 	}
+	delete[] buf;
 	return -1;
 }
 

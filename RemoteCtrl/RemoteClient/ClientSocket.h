@@ -28,6 +28,7 @@ public:
 	BOOL Send(CPacket& packet);
 	BOOL GetFilePath(std::string& strPath);
 	BOOL GetMouseEvent(MOUSEEV& mouse);
+	void CloseSocket();
 private:
 	// Initialize before main
 	// Singleton, private all constructors

@@ -11,6 +11,16 @@ CPacket::CPacket()
 
 CPacket::CPacket(const BYTE* pData, size_t& nSize)
 {
+	if (!pData)
+	{
+		TRACE("pData is NULL");
+		sHead = PACKET_HEAD;
+		strData.clear();
+		sCmd = -1;
+		sSum = 0;
+		nSize = 0;
+		return;
+	}
 	// head
 	size_t i = 0;
 	for (; i < nSize; i++)

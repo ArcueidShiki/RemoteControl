@@ -160,6 +160,26 @@ HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 void CRemoteClientDlg::OnBnClickedBtnTest()
 {
 	CClientSocket* pClient = CClientSocket::GetInstance();
+	if (!pClient->InitSocket("127.0.0.1"))
+	{
+		TRACE("Client Init Socket Failed");
+		return;
+	}
 	CPacket packet(CMD_DRIVER, NULL, 0);
-	pClient->Send(packet);
+	if (!pClient->Send(packet))
+	{
+		TRACE("Client Send Paccket Failed\r\n");
+		return;
+	}
+	TRACE("Client Send Packet Success\r\n");
+	// get return msg from server
+	// first ok without error, but second time emit access violation
+	int ret = pClient->DealCommand();
+	if (ret == -1)
+	{
+		TRACE("Get Return msg from server failed: ret = %d\r\n", ret);
+		return;
+	}
+	TRACE("ACK : %d\r\n", ret);
+	pClient->CloseSocket();
 }

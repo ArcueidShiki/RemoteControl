@@ -419,7 +419,7 @@ int main()
                     MessageBox(NULL, _T("Cannot accept user, auto retry"), _T("Accept Client Failed!"), MB_OK | MB_ICONERROR);
                     count++;
                 }
-
+                TRACE("New Client connection");
 				int cmd = pServer->DealCommand();
 				if (cmd == -1)
 				{
@@ -433,6 +433,8 @@ int main()
 					TRACE("Execute Command failed: cmd = %d, ret = %d\n", cmd, ret);
                 }
 				TRACE("Execute Command : %d, Success\n", cmd);
+                CPacket reply(ret, NULL, 0);
+				pServer->Send(reply);
                 // short connection. FTP usually use long connection
                 pServer->CloseClient();
             }

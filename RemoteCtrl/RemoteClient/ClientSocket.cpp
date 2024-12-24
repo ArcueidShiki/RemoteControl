@@ -148,7 +148,7 @@ int CClientSocket::DealCommand()
 	// 3~4 byte: package length
 	// 5~n-2 byte: package data
 	// n-1~n byte: package check: md5checksum, crc16, crc32
-#define BUF_SIZE 4096
+	int BUF_SIZE = 4096;
 	char* buf = new char[BUF_SIZE];
 	memset(buf, 0, BUF_SIZE);
 	size_t index = 0;
@@ -157,6 +157,7 @@ int CClientSocket::DealCommand()
 		size_t len = recv(m_socket, buf + index, BUF_SIZE - index, 0);
 		if (len <= 0)
 		{
+			delete[] buf;
 			return -1;
 		}
 		index += len;
@@ -168,21 +169,29 @@ int CClientSocket::DealCommand()
 			memmove(buf, buf + len, BUF_SIZE - len);
 			// after moving, the unused spacec for receiving data
 			index -= len;
+			delete[] buf;
 			return m_packet.sCmd;
 		}
 	}
+	delete[] buf;
 	return -1;
 }
 
 BOOL CClientSocket::Send(const char* pData, size_t nSize)
 {
-	if (m_socket == INVALID_SOCKET) return FALSE;
+	if (m_socket == INVALID_SOCKET) {
+		TRACE("Client Socket Invalid\n");
+		return FALSE;
+	}
 	return send(m_socket, pData, nSize, 0) != SOCKET_ERROR;
 }
 
 BOOL CClientSocket::Send(CPacket& packet)
 {
-	if (m_socket == INVALID_SOCKET) return FALSE;
+	if (m_socket == INVALID_SOCKET) {
+		TRACE("Client Socket Invalid\n");
+		return FALSE;
+	}
 	return send(m_socket, packet.Data(), packet.Size(), 0) != SOCKET_ERROR;
 }
 
@@ -208,4 +217,10 @@ BOOL CClientSocket::GetMouseEvent(MOUSEEV& mouse)
 		return TRUE;
 	}
 	return FALSE;
+}
+
+void CClientSocket::CloseSocket()
+{
+	closesocket(m_socket);
+	m_socket = INVALID_SOCKET;
 }
