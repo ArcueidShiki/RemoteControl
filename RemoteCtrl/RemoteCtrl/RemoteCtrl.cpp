@@ -396,10 +396,10 @@ int main()
                 {
                     if (count > 3)
                     {
-						MessageBox(NULL, _T("无法正常接入用户，自动重试次数过多，程序退出"), _T("接入用户失败!"), MB_OK | MB_ICONERROR);
+						MessageBox(NULL, _T("Cannot accept user, failed many time, program exit"), _T("Accept Client Failed!"), MB_OK | MB_ICONERROR);
 						break;
                     }
-                    MessageBox(NULL, _T("无法正常接入用户，自动重试"), _T("接入用户失败!"), MB_OK | MB_ICONERROR);
+                    MessageBox(NULL, _T("Cannot accept user, auto retry"), _T("Accept Client Failed!"), MB_OK | MB_ICONERROR);
                     count++;
                 }
 
