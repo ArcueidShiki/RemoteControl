@@ -3,6 +3,7 @@
 #include "pch.h"
 #include "framework.h"
 #include "Packet.h"
+#include <vector>
 
 typedef struct MouseEvent {
 	MouseEvent()
@@ -47,4 +48,5 @@ private:
 	static CHelper m_helper;
 	SOCKET m_socket;
 	CPacket m_packet;
+	std::vector<char> m_buf;
 };

@@ -10,15 +10,14 @@ CPacket::CPacket()
 }
 
 CPacket::CPacket(const BYTE* pData, size_t& nSize)
+	: sHead(0)
+	, nLength(0)
+	, sCmd(0)
+	, sSum(0)
 {
 	if (!pData)
 	{
 		TRACE("pData is NULL");
-		sHead = PACKET_HEAD;
-		strData.clear();
-		sCmd = -1;
-		sSum = 0;
-		nSize = 0;
 		return;
 	}
 	// head
