@@ -23,7 +23,7 @@ class CClientSocket
 public:
 	// static function no this pointer, belongs to class. can access non static member.
 	static CClientSocket* GetInstance();
-	BOOL InitSocket(const std::string &strIPAddress);
+	BOOL InitSocket(ULONG ip, USHORT port);
 	int DealCommand();
 	BOOL Send(const char* pData, size_t nSize);
 	BOOL Send(CPacket& packet);

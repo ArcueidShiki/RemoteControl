@@ -16,11 +16,6 @@ CClientSocket::CClientSocket()
 		MessageBox(NULL, _T("Cannot Initiate socket environment, please check network setting!"), _T("Soccket Initialization Error!"), MB_OK | MB_ICONERROR);
 		exit(0);
 	}
-	if (!InitSocket("127.0.0.1"))
-	{
-		MessageBox(NULL, _T("Cannot Initiate socket, please check network setting!"), _T("Soccket Initialization Error!"), MB_OK | MB_ICONERROR);
-		exit(0);
-	}
 	m_buf.resize(BUF_SIZE);
 }
 
@@ -106,7 +101,7 @@ std::string GetErrorInfo(int wsaErrCode)
 	return ret;
 }
 
-BOOL CClientSocket::InitSocket(const std::string& strIPAddress)
+BOOL CClientSocket::InitSocket(ULONG ip, USHORT port)
 {
 	if (m_socket != INVALID_SOCKET)
 	{
@@ -121,8 +116,8 @@ BOOL CClientSocket::InitSocket(const std::string& strIPAddress)
 	SOCKADDR_IN serv_addr;
 	memset(&serv_addr, 0, sizeof(serv_addr));
 	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.S_un.S_addr = inet_addr(strIPAddress.c_str());
-	serv_addr.sin_port = htons(10000);	// default port
+	serv_addr.sin_addr.S_un.S_addr = htonl(ip);
+	serv_addr.sin_port = htons(port);	// default port
 	if (serv_addr.sin_addr.S_un.S_addr == INADDR_NONE)
 	{
 		AfxMessageBox(_T("Invalid IP Address"));

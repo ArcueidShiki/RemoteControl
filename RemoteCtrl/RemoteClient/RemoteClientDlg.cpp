@@ -53,6 +53,8 @@ END_MESSAGE_MAP()
 
 CRemoteClientDlg::CRemoteClientDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_REMOTECLIENT_DIALOG, pParent)
+	, m_server_address(0)
+	, m_port(_T(""))
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -60,6 +62,8 @@ CRemoteClientDlg::CRemoteClientDlg(CWnd* pParent /*=nullptr*/)
 void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
+	DDX_IPAddress(pDX, IDC_IPADDRESS_SERV, m_server_address);
+	DDX_Text(pDX, IDC_EDIT_PORT, m_port);
 }
 
 BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
@@ -101,7 +105,10 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
-	// TODO: Add extra initialization here
+	UpdateData();
+	m_port = _T("10000");
+	m_server_address = 0x7F000001; // 127.0.0.1
+	UpdateData(FALSE);
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -159,12 +166,22 @@ HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 
 void CRemoteClientDlg::OnBnClickedBtnTest()
 {
+	// default TRUE: push value from componets to m_var, FALSE: pull value from m_var to components
+	UpdateData();
 	CClientSocket* pClient = CClientSocket::GetInstance();
-	if (!pClient->InitSocket("127.0.0.1"))
+	if (!pClient)
+	{
+		TRACE("pClient is Null");
+		return;
+	}
+	USHORT port = static_cast<USHORT>(atoi(CT2A(m_port)));
+	TRACE("Client Socket Instance Success: ip:%08X, port:%d\r\n", m_server_address, port);
+	if (!pClient->InitSocket(m_server_address, port))
 	{
 		TRACE("Client Init Socket Failed");
 		return;
 	}
+
 	CPacket packet(CMD_DRIVER, NULL, 0);
 	if (!pClient->Send(packet))
 	{
@@ -173,7 +190,6 @@ void CRemoteClientDlg::OnBnClickedBtnTest()
 	}
 	TRACE("Client Send Packet Success\r\n");
 	// get return msg from server
-	// first ok without error, but second time emit access violation
 	int ret = pClient->DealCommand();
 	if (ret == -1)
 	{

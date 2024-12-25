@@ -10,10 +10,6 @@ CPacket::CPacket()
 }
 
 CPacket::CPacket(const BYTE* pData, size_t& nSize)
-	: sHead(0)
-	, nLength(0)
-	, sCmd(0)
-	, sSum(0)
 {
 	if (!pData)
 	{
