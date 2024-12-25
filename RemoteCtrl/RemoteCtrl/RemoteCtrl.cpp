@@ -66,7 +66,7 @@ int MakeDriverInfo()
     // FF FE(head) 09 00 00 00(length = datasize + cmd+sum) 01 00(cnd) 43 2C 44 2C 45(C(43),D(44),E(45)) 24 01(01 24 = 43 + 2C + 44 + 2C + 45)
     Dump((BYTE*)packet.Data(), packet.Size());
 
-	//CServerSocket::GetInstance()->Send(packet);
+	CServerSocket::GetInstance()->Send(packet);
     return 0;
 }
 

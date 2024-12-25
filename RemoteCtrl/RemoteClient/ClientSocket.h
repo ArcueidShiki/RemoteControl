@@ -30,6 +30,7 @@ public:
 	BOOL GetFilePath(std::string& strPath);
 	BOOL GetMouseEvent(MOUSEEV& mouse);
 	void CloseSocket();
+	CPacket& GetPacket() { return m_packet; }
 private:
 	// Initialize before main
 	// Singleton, private all constructors

@@ -64,6 +64,7 @@ void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 	CDialogEx::DoDataExchange(pDX);
 	DDX_IPAddress(pDX, IDC_IPADDRESS_SERV, m_server_address);
 	DDX_Text(pDX, IDC_EDIT_PORT, m_port);
+	DDX_Control(pDX, IDC_TREE_DIR, m_tree);
 }
 
 BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
@@ -71,6 +72,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_BTN_TEST, &CRemoteClientDlg::OnBnClickedBtnTest)
+	ON_BN_CLICKED(IDC_BTN_FILEINFO, &CRemoteClientDlg::OnBnClickedBtnFileinfo)
 END_MESSAGE_MAP()
 
 
@@ -166,27 +168,56 @@ HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 
 void CRemoteClientDlg::OnBnClickedBtnTest()
 {
+	SendCommandPacket(CMD_DRIVER);
+}
+
+void CRemoteClientDlg::OnBnClickedBtnFileinfo()
+{
+	if (SendCommandPacket(CMD_DRIVER) == -1)
+	{
+		AfxMessageBox(_T("Send Command Packet Failed"));
+		return;
+	}
+	CClientSocket* pClient = CClientSocket::GetInstance();
+	std::string drivers = pClient->GetPacket().strData;
+	std::string driver;
+	m_tree.DeleteAllItems();
+	for (size_t i = 0; i < drivers.size(); i++)
+	{
+		if (drivers[i] != ',')
+		{
+			driver = drivers[i];
+			driver += ":";
+			m_tree.InsertItem(CString(driver.c_str()), TVI_ROOT, TVI_LAST);
+			driver.clear();
+		}
+	}
+	UpdateData(FALSE);
+}
+
+int CRemoteClientDlg::SendCommandPacket(int nCmd, BYTE* pData, size_t nLength)
+{
 	// default TRUE: push value from componets to m_var, FALSE: pull value from m_var to components
 	UpdateData();
 	CClientSocket* pClient = CClientSocket::GetInstance();
 	if (!pClient)
 	{
 		TRACE("pClient is Null");
-		return;
+		return -1;
 	}
-	USHORT port = static_cast<USHORT>(atoi(CT2A(m_port)));
+	USHORT port = static_cast<USHORT>(atoi(CW2A(m_port)));
 	TRACE("Client Socket Instance Success: ip:%08X, port:%d\r\n", m_server_address, port);
 	if (!pClient->InitSocket(m_server_address, port))
 	{
 		TRACE("Client Init Socket Failed");
-		return;
+		return -1;
 	}
 
-	CPacket packet(CMD_DRIVER, NULL, 0);
+	CPacket packet(nCmd, pData, nLength);
 	if (!pClient->Send(packet))
 	{
 		TRACE("Client Send Paccket Failed\r\n");
-		return;
+		return -1;
 	}
 	TRACE("Client Send Packet Success\r\n");
 	// get return msg from server
@@ -194,8 +225,9 @@ void CRemoteClientDlg::OnBnClickedBtnTest()
 	if (ret == -1)
 	{
 		TRACE("Get Return msg from server failed: ret = %d\r\n", ret);
-		return;
+		return -1;
 	}
 	TRACE("ACK : %d\r\n", ret);
 	pClient->CloseSocket();
+	return nCmd;
 }
