@@ -10,6 +10,10 @@ CPacket::CPacket()
 }
 
 CPacket::CPacket(const BYTE* pData, size_t& nSize)
+	: sHead(0)
+	, nLength(0)
+	, sCmd(0)
+	, sSum(0)
 {
 	if (!pData)
 	{
@@ -92,10 +96,10 @@ CPacket& CPacket::operator=(const CPacket& other)
 	return *this;
 }
 
-CPacket::CPacket(DWORD nCmd, const BYTE* pData, size_t nSize)
+CPacket::CPacket(WORD nCmd, const BYTE* pData, size_t nSize)
 {
 	sHead = PACKET_HEAD;
-	nLength = nSize + sizeof(sCmd) + sizeof(sSum);
+	nLength = DWORD(nSize + sizeof(sCmd) + sizeof(sSum));
 	sCmd = nCmd;
 	if (nSize > 0 && pData)
 	{

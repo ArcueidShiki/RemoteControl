@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "ServerSocket.h"
 
-#define BUF_SIZE 4096
+constexpr int BUF_SIZE = 4096;
 
 //define and init static member outside class
 CServerSocket* CServerSocket::m_instance = NULL;
@@ -157,7 +157,7 @@ int CServerSocket::DealCommand()
 		return -2;
 	}
 	memset(buf, 0, BUF_SIZE);
-	size_t index = 0;
+	int index = 0;
 	while (TRUE)
 	{
 		size_t len = recv(m_client, buf + index, BUF_SIZE - index, 0);
@@ -166,7 +166,7 @@ int CServerSocket::DealCommand()
 			delete[] buf;
 			return -1;
 		}
-		index += len;
+		index += (int)len;
 		len = index;
 		m_packet = CPacket((BYTE*)buf, len);
 		if (len > 0)
@@ -174,7 +174,7 @@ int CServerSocket::DealCommand()
 			// move unparse bytes leftover to head of buffer(parsed bytes),
 			memmove(buf, buf + len, BUF_SIZE - len);
 			// after moving, the unused spacec for receiving data
-			index -= len;
+			index -= (int)len;
 			delete[] buf;
 			return m_packet.sCmd;
 		}
@@ -186,19 +186,19 @@ int CServerSocket::DealCommand()
 BOOL CServerSocket::Send(const char* pData, size_t nSize)
 {
 	if (m_client == INVALID_SOCKET) return FALSE;
-	return send(m_client, pData, nSize, 0) != SOCKET_ERROR;
+	return send(m_client, pData, (int)nSize, 0) != SOCKET_ERROR;
 }
 
 BOOL CServerSocket::Send(CPacket& packet)
 {
 	if (m_client == INVALID_SOCKET) return FALSE;
-	return send(m_client, packet.Data(), packet.Size(), 0) != SOCKET_ERROR;
+	return send(m_client, packet.Data(), (int)packet.Size(), 0) != SOCKET_ERROR;
 }
 
 BOOL CServerSocket::GetFilePath(std::string& strPath)
 {
 	if (m_packet.sCmd == CMD_DIR || m_packet.sCmd == CMD_RUN_FILE
-		|| m_packet.sCmd == CMD_DLD_FILE)
+		|| m_packet.sCmd == CMD_DLD_FILE || m_packet.sCmd == CMD_DEL_FILE)
 	{
 		strPath = m_packet.strData;
 		return TRUE;

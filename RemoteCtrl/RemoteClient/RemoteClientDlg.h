@@ -3,7 +3,7 @@
 //
 
 #pragma once
-
+#include "ClientSocket.h"
 
 // CRemoteClientDlg dialog
 class CRemoteClientDlg : public CDialogEx
@@ -40,7 +40,9 @@ private:
 	int SendCommandPacket(int nCmd, BOOL autoclose = TRUE, BYTE* pData = NULL, size_t nLength = 0);
 	CString GetPath(HTREEITEM hTree);
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
-	void LoadFileInfo();
+	void LoadDirectory();
+	void LoadFiles();
+	CClientSocket* pClient;
 public:
 	CTreeCtrl m_tree;
 	afx_msg void OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult);
@@ -48,4 +50,7 @@ public:
 	// Display File
 	CListCtrl m_list;
 	afx_msg void OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnDownloadFile();
+	afx_msg void OnDeleteFile();
+	afx_msg void OnOpenFile();
 };

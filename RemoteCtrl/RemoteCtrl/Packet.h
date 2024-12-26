@@ -7,10 +7,11 @@
 #define CMD_DIR 2
 #define CMD_RUN_FILE 3
 #define CMD_DLD_FILE 4
-#define CMD_MOUSE 5
-#define CMD_SEND_SCREEN 6
-#define CMD_LOCK_MACHINE 7
-#define CMD_UNLOCK_MACHINE 8
+#define CMD_DEL_FILE 5
+#define CMD_MOUSE 6
+#define CMD_SEND_SCREEN 7
+#define CMD_LOCK_MACHINE 8
+#define CMD_UNLOCK_MACHINE 9
 #define CMD_ACK 0xFF
 
 class CPacket
@@ -21,7 +22,7 @@ public:
 	// parse packet
 	CPacket(const BYTE* pData, size_t& nSize);
 	// construct packet
-	CPacket(DWORD nCmd, const BYTE* pData, size_t nSize);
+	CPacket(WORD nCmd, const BYTE* pData, size_t nSize);
 	CPacket& operator=(const CPacket& other);
 	~CPacket() {}
 	size_t Size() const;
