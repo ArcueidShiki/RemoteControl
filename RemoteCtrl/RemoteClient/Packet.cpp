@@ -118,6 +118,9 @@ size_t CPacket::Size() const
 	return sizeof(sHead) + nLength + sizeof(sCmd) + sizeof(sSum);
 }
 
+/**
+Only for dump packet data
+*/
 const char* CPacket::Data()
 {
 	strOut.resize(Size());

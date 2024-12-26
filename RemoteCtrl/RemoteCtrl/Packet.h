@@ -11,6 +11,7 @@
 #define CMD_SEND_SCREEN 6
 #define CMD_LOCK_MACHINE 7
 #define CMD_UNLOCK_MACHINE 8
+#define CMD_ACK 0xFF
 
 class CPacket
 {

@@ -70,19 +70,18 @@ int MakeDriverInfo()
     return 0;
 }
 
-typedef struct file_info{
-    file_info()
+BOOL Ack()
+{
+    CServerSocket* pServer = CServerSocket::GetInstance();
+    CPacket ack(CMD_ACK, NULL, 0);
+    pServer->Send(ack);
+    if (pServer->DealCommand() != CMD_ACK)
     {
-        IsValid = TRUE;
-        IsDirectory = FALSE;
-        HasNext = TRUE;
-        memset(szFileName, 0, sizeof(szFileName));
+        TRACE("Client Failed to response the packet\r\n");
+        return FALSE;
     }
-    BOOL IsValid;
-    BOOL IsDirectory;
-    BOOL HasNext;
-    char szFileName[256];
-} FILEINFO, *PFILEINFO;
+    return TRUE;
+}
 
 /**
 * Lookup directories
@@ -90,7 +89,8 @@ typedef struct file_info{
 int MakeDirectoryInfo()
 {
     std::string strPath;
-    if (!CServerSocket::GetInstance()->GetFilePath(strPath))
+    CServerSocket *pServer = CServerSocket::GetInstance();
+    if (!pServer->GetFilePath(strPath))
     {
 		OutputDebugString(_T("GetFilePath failed, Current cmd is not get file list, parse failed!!!\n"));
         return -1;
@@ -104,29 +104,38 @@ int MakeDirectoryInfo()
         memcpy(finfo.szFileName, strPath.c_str(), strPath.size());
 		OutputDebugString(_T("No permission to access the directory\n"));
         CPacket packet(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
-        CServerSocket::GetInstance()->Send(packet);
+        pServer->Send(packet);
         return -2;
     }
     _finddata_t fdata;
-    int hfind = 0;
+    // If not sure the type, use auto
+    intptr_t hfind = 0;
     if ((hfind = _findfirst("*", &fdata)) == -1 )
     {
 		OutputDebugString(_T("No files in the directory\n"));
 		return -3;
     }
+    int ret;
+    int id = 0;
     do {
         FILEINFO finfo;
         finfo.IsDirectory = fdata.attrib & _A_SUBDIR;
         memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
         CPacket packet(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
-        CServerSocket::GetInstance()->Send(packet);
-    } while (!_findnext(hfind, &fdata));
+        pServer->Send(packet); // NONBLOCK
+        TRACE("Server Send filename id : [%d], name: [%s], HasNext: [%d]\r\n", ++id, fdata.name, finfo.HasNext);
+        // it will blow up the buffer of client
+        // using ack or sleep
+        Sleep(10);
+        ret = _findnext(hfind, &fdata);
+    } while (ret == 0);
     // when tmpfiles or logfiles, are huge, so send one file every time read.
-    // tell client, end.
     FILEINFO finfo;
+    // tell client, end.
     finfo.HasNext = FALSE;
     CPacket packet(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
-    CServerSocket::GetInstance()->Send(packet);
+    pServer->Send(packet);
+    _findclose(hfind);
     return 0;
 }
 
@@ -419,20 +428,20 @@ int main()
                     MessageBox(NULL, _T("Cannot accept user, auto retry"), _T("Accept Client Failed!"), MB_OK | MB_ICONERROR);
                     count++;
                 }
-                TRACE("New Client connection");
+                //TRACE("New Client connection\n");
 				int cmd = pServer->DealCommand();
 				if (cmd == -1)
 				{
 					TRACE("Parse Command failed\n");
 					break;
 				}
-                TRACE("Parse Command : %d\n", cmd);
+                //TRACE("Parse Command : %d\n", cmd);
                 int ret = ExecuteCommand(cmd);
-                if (ret != 0)
+                if (ret == -1)
                 {
 					TRACE("Execute Command failed: cmd = %d, ret = %d\n", cmd, ret);
                 }
-				TRACE("Execute Command : %d, Success\n", cmd);
+				//TRACE("Execute Command : %d, Success\n", cmd);
                 CPacket reply(ret, NULL, 0);
 				pServer->Send(reply);
                 // short connection. FTP usually use long connection
@@ -443,7 +452,6 @@ int main()
     }
     else
     {
-        // TODO: change error code to suit your needs
         wprintf(L"Fatal Error: GetModuleHandle failed\n");
         nRetCode = 1;
     }

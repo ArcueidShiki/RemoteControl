@@ -73,6 +73,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_BTN_TEST, &CRemoteClientDlg::OnBnClickedBtnTest)
 	ON_BN_CLICKED(IDC_BTN_FILEINFO, &CRemoteClientDlg::OnBnClickedBtnFileinfo)
+	ON_NOTIFY(NM_DBLCLK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMDblclkTreeDir)
 END_MESSAGE_MAP()
 
 
@@ -188,14 +189,15 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 		{
 			driver = drivers[i];
 			driver += ":";
-			m_tree.InsertItem(CString(driver.c_str()), TVI_ROOT, TVI_LAST);
+			HTREEITEM hCur = m_tree.InsertItem(CString(driver.c_str()), TVI_ROOT, TVI_LAST);
+			m_tree.InsertItem(L"", hCur, TVI_LAST);
 			driver.clear();
 		}
 	}
 	UpdateData(FALSE);
 }
 
-int CRemoteClientDlg::SendCommandPacket(int nCmd, BYTE* pData, size_t nLength)
+int CRemoteClientDlg::SendCommandPacket(int nCmd, BOOL autoclose, BYTE* pData, size_t nLength)
 {
 	// default TRUE: push value from componets to m_var, FALSE: pull value from m_var to components
 	UpdateData();
@@ -206,7 +208,7 @@ int CRemoteClientDlg::SendCommandPacket(int nCmd, BYTE* pData, size_t nLength)
 		return -1;
 	}
 	USHORT port = static_cast<USHORT>(atoi(CW2A(m_port)));
-	TRACE("Client Socket Instance Success: ip:%08X, port:%d\r\n", m_server_address, port);
+	//TRACE("Client Socket Instance Success: ip:%08X, port:%d\r\n", m_server_address, port);
 	if (!pClient->InitSocket(m_server_address, port))
 	{
 		TRACE("Client Init Socket Failed");
@@ -219,7 +221,7 @@ int CRemoteClientDlg::SendCommandPacket(int nCmd, BYTE* pData, size_t nLength)
 		TRACE("Client Send Paccket Failed\r\n");
 		return -1;
 	}
-	TRACE("Client Send Packet Success\r\n");
+	//TRACE("Client Send Packet Success\r\n");
 	// get return msg from server
 	int ret = pClient->DealCommand();
 	if (ret == -1)
@@ -227,7 +229,85 @@ int CRemoteClientDlg::SendCommandPacket(int nCmd, BYTE* pData, size_t nLength)
 		TRACE("Get Return msg from server failed: ret = %d\r\n", ret);
 		return -1;
 	}
-	TRACE("ACK : %d\r\n", ret);
-	pClient->CloseSocket();
+	if (autoclose)
+	{
+		pClient->CloseSocket();
+	}
 	return nCmd;
+}
+
+/**
+* Return the full path of clicked tree item.
+*/
+CString CRemoteClientDlg::GetPath(HTREEITEM hTree)
+{
+	CString strRet, strParent;
+	strRet = m_tree.GetItemText(hTree);
+	// from leaf to root
+	HTREEITEM hParent = m_tree.GetParentItem(hTree);
+	while (hParent) {
+		strParent = m_tree.GetItemText(hParent);
+		strRet = strParent + L"\\" + strRet;
+		hParent = m_tree.GetParentItem(hParent);
+	}
+	strRet += L"\\";
+	return strRet;
+}
+
+void CRemoteClientDlg::DeleteTreeChildrenItem(HTREEITEM hTree)
+{
+	HTREEITEM hSub = NULL;
+	do {
+		hSub = m_tree.GetChildItem(hTree);
+		if (hSub) m_tree.DeleteItem(hSub);
+	} while (hSub);
+}
+
+void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	*pResult = 0;
+	CPoint ptMouse;
+	GetCursorPos(&ptMouse); // global point to screen
+	m_tree.ScreenToClient(&ptMouse); // screen to client
+	HTREEITEM hTreeSelected= m_tree.HitTest(ptMouse, 0);
+	if (hTreeSelected == NULL)
+	{
+		TRACE("No Item Selected\n");
+		return;
+	}
+	if (m_tree.GetChildItem(hTreeSelected) == NULL)
+	{
+		return; // no child, no directory, this is a file clicked
+	}
+	DeleteTreeChildrenItem(hTreeSelected);
+	auto pClient = CClientSocket::GetInstance();
+	CString strPath = GetPath(hTreeSelected);
+	CT2A asciiPath(strPath);
+	const char* path = asciiPath;
+	int strLen = strlen(asciiPath);
+	TRACE("strPath: %s Length: %d\n", path, strLen);
+	int nCmd = SendCommandPacket(CMD_DIR, FALSE, (BYTE*)path, strLen);
+	PFILEINFO pInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
+	int id = 0;
+	while (pInfo->HasNext)
+	{
+		TRACE("Client receive file id: [%d], name: [%s] Has Next: [%d] \n", ++id, pInfo->szFileName, pInfo->HasNext);
+		if (!pInfo->IsDirectory)
+		{
+			// FILE
+			TRACE("Insert file:%s\n", pInfo->szFileName);
+			m_tree.InsertItem(CString(pInfo->szFileName), hTreeSelected, TVI_LAST);
+		}
+		else if (strcmp(pInfo->szFileName, ".") && strcmp(pInfo->szFileName, ".."))
+		{
+			// Directory not . or .., NORMAL Dir.
+			HTREEITEM hCur = m_tree.InsertItem(CString(pInfo->szFileName), hTreeSelected, TVI_LAST);
+			TRACE("Insert Directory:%s\n", pInfo->szFileName);
+			m_tree.InsertItem(L"", hCur, TVI_LAST);
+		}
+		int cmd = pClient->DealCommand();
+		if (cmd < 0) break;
+		pInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
+	}
+	pClient->CloseSocket();
 }
