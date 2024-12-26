@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "ClientSocket.h"
 
-#define BUF_SIZE 4096
+constexpr int BUF_SIZE = 4096;
 
 //define and init static member outside class
 CClientSocket* CClientSocket::m_instance = NULL;
@@ -105,7 +105,7 @@ BOOL CClientSocket::InitSocket(ULONG ip, USHORT port)
 {
 	if (m_socket != INVALID_SOCKET)
 	{
-		return TRUE;
+		CloseSocket(); // Close previous socket;
 	}
 	m_socket = socket(AF_INET, SOCK_STREAM, 0);
 	if (m_socket == INVALID_SOCKET)
@@ -153,7 +153,7 @@ int CClientSocket::DealCommand()
 		return -2;
 	}
 	memset(buf, 0, BUF_SIZE);
-	size_t index = 0;
+	int index = 0;
 	while (TRUE)
 	{
 		size_t len = recv(m_socket, buf + index, BUF_SIZE - index, 0);
@@ -161,7 +161,7 @@ int CClientSocket::DealCommand()
 		{
 			return -1;
 		}
-		index += len;
+		index += (int)len;
 		len = index;
 		m_packet = CPacket((BYTE*)buf, len);
 		if (len > 0)
@@ -169,7 +169,7 @@ int CClientSocket::DealCommand()
 			// move unparse bytes leftover to head of buffer(parsed bytes),
 			memmove(buf, buf + len, BUF_SIZE - len);
 			// after moving, the unused spacec for receiving data
-			index -= len;
+			index -= (int)len;
 			return m_packet.sCmd;
 		}
 	}
@@ -182,7 +182,7 @@ BOOL CClientSocket::Send(const char* pData, size_t nSize)
 		TRACE("Client Socket Invalid\n");
 		return FALSE;
 	}
-	return send(m_socket, pData, nSize, 0) != SOCKET_ERROR;
+	return send(m_socket, pData, (int)nSize, 0) != SOCKET_ERROR;
 }
 
 BOOL CClientSocket::Send(CPacket& packet)
@@ -191,7 +191,7 @@ BOOL CClientSocket::Send(CPacket& packet)
 		TRACE("Client Socket Invalid\n");
 		return FALSE;
 	}
-	return send(m_socket, packet.Data(), packet.Size(), 0) != SOCKET_ERROR;
+	return send(m_socket, packet.Data(), (int)packet.Size(), 0) != SOCKET_ERROR;
 }
 
 BOOL CClientSocket::GetFilePath(std::string& strPath)

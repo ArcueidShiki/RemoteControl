@@ -7,7 +7,6 @@
 #include "RemoteClient.h"
 #include "RemoteClientDlg.h"
 #include "afxdialogex.h"
-#include "ClientSocket.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -15,7 +14,6 @@
 
 
 // CAboutDlg dialog used for App About
-
 class CAboutDlg : public CDialogEx
 {
 public:
@@ -57,6 +55,7 @@ CRemoteClientDlg::CRemoteClientDlg(CWnd* pParent /*=nullptr*/)
 	, m_port(_T(""))
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+	pClient = CClientSocket::GetInstance();
 }
 
 void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
@@ -78,6 +77,9 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_NOTIFY(NM_DBLCLK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMDblclkTreeDir)
 	ON_NOTIFY(NM_CLICK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMClickTreeDir)
 	ON_NOTIFY(NM_RCLICK, IDC_LIST_FILE, &CRemoteClientDlg::OnNMRClickListFile)
+	ON_COMMAND(ID_DOWNLOAD_FILE, &CRemoteClientDlg::OnDownloadFile)
+	ON_COMMAND(ID_DELETE_FILE, &CRemoteClientDlg::OnDeleteFile)
+	ON_COMMAND(ID_OPEN_FILE, &CRemoteClientDlg::OnOpenFile)
 END_MESSAGE_MAP()
 
 
@@ -183,7 +185,6 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 		AfxMessageBox(_T("Send Command Packet Failed"));
 		return;
 	}
-	CClientSocket* pClient = CClientSocket::GetInstance();
 	std::string drivers = pClient->GetPacket().strData;
 	std::string driver;
 	m_tree.DeleteAllItems();
@@ -205,7 +206,6 @@ int CRemoteClientDlg::SendCommandPacket(int nCmd, BOOL autoclose, BYTE* pData, s
 {
 	// default TRUE: push value from componets to m_var, FALSE: pull value from m_var to components
 	UpdateData();
-	CClientSocket* pClient = CClientSocket::GetInstance();
 	if (!pClient)
 	{
 		TRACE("pClient is Null");
@@ -225,7 +225,6 @@ int CRemoteClientDlg::SendCommandPacket(int nCmd, BOOL autoclose, BYTE* pData, s
 		TRACE("Client Send Paccket Failed\r\n");
 		return -1;
 	}
-	//TRACE("Client Send Packet Success\r\n");
 	// get return msg from server
 	int ret = pClient->DealCommand();
 	if (ret == -1)
@@ -233,6 +232,8 @@ int CRemoteClientDlg::SendCommandPacket(int nCmd, BOOL autoclose, BYTE* pData, s
 		TRACE("Get Return msg from server failed: ret = %d\r\n", ret);
 		return -1;
 	}
+	CPacket ack(CMD_ACK, NULL, 0);
+	pClient->Send(ack);
 	if (autoclose)
 	{
 		pClient->CloseSocket();
@@ -241,7 +242,9 @@ int CRemoteClientDlg::SendCommandPacket(int nCmd, BOOL autoclose, BYTE* pData, s
 }
 
 /**
-* Return the full path of clicked tree item.
+* Get the full directory path of clicked tree item.
+* @param hTree: tree node
+* @return CString: full directory path
 */
 CString CRemoteClientDlg::GetPath(HTREEITEM hTree)
 {
@@ -267,7 +270,7 @@ void CRemoteClientDlg::DeleteTreeChildrenItem(HTREEITEM hTree)
 	} while (hSub);
 }
 
-void CRemoteClientDlg::LoadFileInfo()
+void CRemoteClientDlg::LoadDirectory()
 {
 	CPoint ptMouse;
 	GetCursorPos(&ptMouse); // global point to screen
@@ -284,12 +287,11 @@ void CRemoteClientDlg::LoadFileInfo()
 	}
 	DeleteTreeChildrenItem(hTreeSelected);
 	m_list.DeleteAllItems();
-	auto pClient = CClientSocket::GetInstance();
 	CString strPath = GetPath(hTreeSelected);
 	CT2A asciiPath(strPath);
 	const char* path = asciiPath;
-	int strLen = strlen(asciiPath);
-	TRACE("strPath: %s Length: %d\n", path, strLen);
+	size_t strLen = strlen(asciiPath);
+	TRACE("strPath: %s Length: %zu\n", path, strLen);
 	int nCmd = SendCommandPacket(CMD_DIR, FALSE, (BYTE*)path, strLen);
 	PFILEINFO pInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
 	int id = 0;
@@ -313,20 +315,47 @@ void CRemoteClientDlg::LoadFileInfo()
 		if (cmd < 0) break;
 		pInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
 	}
-	pClient->CloseSocket();
+}
+
+void CRemoteClientDlg::LoadFiles()
+{
+	HTREEITEM hTreeSelected = m_tree.GetSelectedItem();
+	CString strPath = GetPath(hTreeSelected);
+	m_list.DeleteAllItems();
+	CT2A asciiPath(strPath);
+	const char* path = asciiPath;
+	size_t strLen = strlen(asciiPath);
+	TRACE("strPath: %s Length: %zu\n", path, strLen);
+	int nCmd = SendCommandPacket(CMD_DIR, FALSE, (BYTE*)path, strLen);
+	PFILEINFO pInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
+	int id = 0;
+	while (pInfo->HasNext)
+	{
+		//TRACE("Client receive file id: [%d], name: [%s] Has Next: [%d] \n", ++id, pInfo->szFileName, pInfo->HasNext);
+		if (!pInfo->IsDirectory)
+		{
+			// FILE
+			//TRACE("Insert file:%s\n", pInfo->szFileName);
+			m_list.InsertItem(0, CString(pInfo->szFileName));
+		}
+		int cmd = pClient->DealCommand();
+		TRACE("Client Deal Command [ACK]: [%d]\n", cmd);
+		if (cmd < 0) break;
+		pInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
+	}
 }
 
 void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	*pResult = 0;
-	LoadFileInfo();
+	LoadDirectory();
 }
 
 
 void CRemoteClientDlg::OnNMClickTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	*pResult = 0;
-	LoadFileInfo();
+	LoadDirectory();
 }
 
 
@@ -348,3 +377,108 @@ void CRemoteClientDlg::OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult)
 		pPopup->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, ptMouse.x, ptMouse.y, this);
 	}
 }
+
+
+void CRemoteClientDlg::OnDownloadFile()
+{
+	int nListSelected = m_list.GetSelectionMark();
+	CString strFile = m_list.GetItemText(nListSelected, 0);
+	// Need a dlg;
+	// False for Save sa, "extension", "filename", flags, filter, parent
+	CFileDialog dlg(FALSE, L"*", strFile, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, NULL, this);
+	if (dlg.DoModal() == IDOK) // need handle first, cannot move to other window
+	{
+		FILE* pFile;
+		CT2A DPath(dlg.GetPathName());
+		char* downloadPath = DPath;
+		int err = fopen_s(&pFile, downloadPath, "wb+");
+		if (err != 0 || pFile == NULL)
+		{
+			AfxMessageBox(L"Open Dlg File Failed\n");
+			TRACE("Open Download Path : [%s] Failed\n", downloadPath);
+			return;
+		}
+
+		HTREEITEM hTreeSelected = m_tree.GetSelectedItem();
+		if (hTreeSelected == NULL)
+		{
+			AfxMessageBox(L"No Tree Item Selected\n");
+			TRACE("Download File Failed, No Item Selected\n");
+			return;
+		}
+
+		CW2A asciiFullPath(GetPath(hTreeSelected) + strFile);
+		char* filepath = asciiFullPath;
+		size_t len = strlen(filepath);
+		TRACE("Full File Path : [%s], name len:[%zu]\n", filepath, len);
+		int ret = SendCommandPacket(CMD_DLD_FILE, FALSE, (BYTE*)filepath, len);
+		if (ret < 0)
+		{
+			AfxMessageBox(L"Donwload File Failed");
+			TRACE("Download File Failed ret = %d\n", ret);
+			return;
+		}
+		auto nLength = *(long long*)pClient->GetPacket().strData.c_str();
+		if (nLength == 0)
+		{
+			AfxMessageBox(L"File size is Zero or Download File Failed");
+			TRACE("Download File Failed, File Size = 0\n");
+			return;
+		}
+		TRACE("Client Filename:[%s], size:[%lld]\n", filepath, nLength);
+		long long nCount = 0;
+		while (nCount < nLength)
+		{
+			ret = pClient->DealCommand();
+			if (ret < 0)
+			{
+				AfxMessageBox(L"Transmission Failed\n");
+				TRACE("Download File Failed, Deal Command Failed ret = %d\n", ret);
+				break;
+			}
+			std::string data = pClient->GetPacket().strData;
+			nCount += data.size();
+			fwrite(data.c_str(), 1, data.size(), pFile);
+		}
+		fclose(pFile);
+		//pClient->CloseSocket();
+	}
+}
+
+void CRemoteClientDlg::OnDeleteFile()
+{
+	HTREEITEM hTreeSelected = m_tree.GetSelectedItem();
+	CString dirPath = GetPath(hTreeSelected);
+	int nListSelected = m_list.GetSelectionMark();
+	CString strFile = m_list.GetItemText(nListSelected, 0);
+	CT2A asciiFullPath(dirPath + strFile);
+	char* fullpath = asciiFullPath;
+	// wcstombs_s(&nConverted, fullpath, MAX_PATH, asciiFullPath, MAX_PATH);
+	TRACE("Full File Path : [%s], name len:[%zu]\n", fullpath, strlen(fullpath));
+	int ret = SendCommandPacket(CMD_DEL_FILE, TRUE, (BYTE*)fullpath, strlen(fullpath));
+	if (ret < 0)
+	{
+		AfxMessageBox(L"Delete File Failed");
+		TRACE("Delete File Failed, ret = %d\n", ret);
+	}
+	LoadFiles();
+}
+
+
+void CRemoteClientDlg::OnOpenFile()
+{
+	HTREEITEM hTreeSelected = m_tree.GetSelectedItem();
+	CString dirPath = GetPath(hTreeSelected);
+	int nListSelected = m_list.GetSelectionMark();
+	CString strFile = m_list.GetItemText(nListSelected, 0);
+	CT2A asciiFullPath(dirPath + strFile);
+	char* fullpath = asciiFullPath;
+	TRACE("Full File Path : [%s], name len:[%zu]\n", fullpath, strlen(fullpath));
+	int ret = SendCommandPacket(CMD_RUN_FILE, TRUE, (BYTE*)fullpath, strlen(fullpath));
+	if (ret < 0)
+	{
+		AfxMessageBox(L"Open File Failed");
+		TRACE("Open File Failed, ret = %d\n", ret);
+	}
+}
+

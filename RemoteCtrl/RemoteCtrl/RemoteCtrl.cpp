@@ -28,6 +28,8 @@ unsigned tid = 0;
 
 CWinApp theApp;
 
+CServerSocket *pServer;
+
 using namespace std;
 
 void Dump(BYTE *pData, size_t nSize)
@@ -66,21 +68,15 @@ int MakeDriverInfo()
     // FF FE(head) 09 00 00 00(length = datasize + cmd+sum) 01 00(cnd) 43 2C 44 2C 45(C(43),D(44),E(45)) 24 01(01 24 = 43 + 2C + 44 + 2C + 45)
     Dump((BYTE*)packet.Data(), packet.Size());
 
-	CServerSocket::GetInstance()->Send(packet);
+    pServer->Send(packet);
     return 0;
 }
 
-BOOL Ack()
+void Ack()
 {
-    CServerSocket* pServer = CServerSocket::GetInstance();
-    CPacket ack(CMD_ACK, NULL, 0);
-    pServer->Send(ack);
-    if (pServer->DealCommand() != CMD_ACK)
+    while (pServer->DealCommand() != CMD_ACK)
     {
-        TRACE("Client Failed to response the packet\r\n");
-        return FALSE;
     }
-    return TRUE;
 }
 
 /**
@@ -89,7 +85,6 @@ BOOL Ack()
 int MakeDirectoryInfo()
 {
     std::string strPath;
-    CServerSocket *pServer = CServerSocket::GetInstance();
     if (!pServer->GetFilePath(strPath))
     {
 		OutputDebugString(_T("GetFilePath failed, Current cmd is not get file list, parse failed!!!\n"));
@@ -142,11 +137,11 @@ int MakeDirectoryInfo()
 int RunFile()
 {
     std::string strPath;
-    CServerSocket::GetInstance()->GetFilePath(strPath);
+    pServer->GetFilePath(strPath);
     // open / run file.
     ShellExecuteA(NULL, NULL, strPath.c_str(), NULL, NULL, SW_SHOWNORMAL);
     CPacket packet(CMD_RUN_FILE, NULL, 0);
-    CServerSocket::GetInstance()->Send(packet);
+    pServer->Send(packet);
     return 0;
 }
 
@@ -154,33 +149,87 @@ int DownloadFile()
 {
 #define DLD_BUF_SIZE 1024 // local scope macro, is not accessible globally.
     std::string strPath;
-    CServerSocket::GetInstance()->GetFilePath(strPath);
+    pServer->GetFilePath(strPath);
     FILE* pFile = NULL;
+    long long size = 0;
 	// if you open first, then, other process open this in exclusive mode, you have the pointer, but cannot do anything.
     // Or property->C/C++->preprocessor->_CRT_SECURE_NO_WARNINGS
     // Or #pragma warning(disable:4996)
     errno_t err = fopen_s(&pFile, strPath.c_str(), "rb");
-    if (!pFile || err != 0)
+    // TODO this logic is different
+    if (err != 0)
     {
-		CPacket packet(CMD_DLD_FILE, NULL, 0);
-		CServerSocket::GetInstance()->Send(packet);
+		CPacket packet(CMD_DLD_FILE, (BYTE*)&size, sizeof(size));
+        pServer->Send(packet);
+        TRACE("Open File failed filename:[%s], name len: %zu\n", strPath.c_str(), strPath.size());
 		return -1;
     }
-    fseek(pFile, 0, SEEK_END);
-    long long data = _ftelli64(pFile);
-    CPacket head(CMD_DLD_FILE, (BYTE*)&data, sizeof(data));
-    fseek(pFile, 0, SEEK_SET);
-    char buf[DLD_BUF_SIZE] = "";
-    size_t rlen = 0;
-    do {
-        rlen = fread(buf, 1, DLD_BUF_SIZE, pFile);
-        CPacket packet(CMD_DLD_FILE, (BYTE*)buf, rlen);
-        CServerSocket::GetInstance()->Send(packet);
-	} while (rlen >= DLD_BUF_SIZE);
-    CPacket packet(CMD_DLD_FILE, NULL, 0);
-    CServerSocket::GetInstance()->Send(packet);
-    fclose(pFile);
+    if (pFile)
+    {
+
+        fseek(pFile, 0, SEEK_END); 
+        size = _ftelli64(pFile);
+        TRACE("Server Filename:[%s], size:[%lld]\n", strPath.c_str(), size);
+        CPacket head(CMD_DLD_FILE, (BYTE*)&size, sizeof(size));
+        pServer->Send(head);
+		if (pServer->DealCommand() != CMD_ACK)
+		{
+			TRACE("Client ACK failed\n");
+			return -1;
+		}
+        fseek(pFile, 0, SEEK_SET);
+        char buf[DLD_BUF_SIZE] = "";
+        size_t rlen = 0;
+        do {
+            rlen = fread(buf, 1, DLD_BUF_SIZE, pFile);
+            CPacket packet(CMD_DLD_FILE, (BYTE*)buf, rlen);
+            pServer->Send(packet);
+            if (pServer->DealCommand() != CMD_ACK)
+            {
+                TRACE("Client ACK failed\n");
+                return -1;
+            }
+        } while (rlen >= DLD_BUF_SIZE);
+        // finish
+        //CPacket packet(CMD_DLD_FILE, NULL, 0);
+        //pServer->Send(packet); // wait for client ack.
+        fclose(pFile);
+    }
 	return 0;
+}
+
+int DelFile()
+{
+    std::string strPath;
+    pServer->GetFilePath(strPath);
+    TRACE("strPath: [%s]\n", strPath.c_str());
+	WCHAR sPath[MAX_PATH] = _T("");
+    size_t nConverted;
+    // this fail,
+    errno_t err = mbstowcs_s(&nConverted, sPath, MAX_PATH, strPath.c_str(), strPath.size());
+    if (err != 0)
+    {
+        TRACE("mbstowcs_s failed, error code: %d, nConverted: %zu\n", err, nConverted);
+        return -1;
+    }
+    if (!DeleteFile((LPCWSTR)sPath))
+    {
+        TRACE("DeleteFile failed, error code: %d\n", GetLastError());
+    }
+
+    TRACE("Converted path: %ws\n", sPath);
+	memset(sPath, 0, MAX_PATH);
+    // This success
+    MultiByteToWideChar(CP_ACP, 0, strPath.c_str(), strPath.size(), sPath, MAX_PATH);
+    if (!DeleteFileW(sPath))
+    {
+		TRACE("DeleteFileW failed, error code: %d\n", GetLastError());
+    }
+	DeleteFileA(strPath.c_str());
+    CPacket packet(CMD_DEL_FILE, NULL, 0);
+	BOOL ret = pServer->Send(packet);
+	TRACE("Send ret = %d\n", ret);
+    return 0;
 }
 
 int MouseEvent()
@@ -195,7 +244,7 @@ int MouseEvent()
 #define UP 0x40
 
     MOUSEEV mouse;
-    if (CServerSocket::GetInstance()->GetMouseEvent(mouse))
+    if (pServer->GetMouseEvent(mouse))
     {
         DWORD operation = mouse.nButton;
         if (operation != MOVE)
@@ -255,7 +304,7 @@ int MouseEvent()
 				mouse_event(MOUSEEVENTF_MOVE, mouse.point.x, mouse.point.y, 0, GetMessageExtraInfo());
         }
         CPacket packet(CMD_MOUSE, NULL, 0);
-        CServerSocket::GetInstance()->Send(packet);
+        pServer->Send(packet);
     }
     else
     {
@@ -298,7 +347,7 @@ int SendScreen()
     PBYTE pData = (PBYTE)GlobalLock(hMem);
     SIZE_T nSize = GlobalSize(hMem);
     CPacket packet(CMD_SEND_SCREEN, pData, nSize);
-    CServerSocket::GetInstance()->Send(packet);
+    pServer->Send(packet);
     GlobalUnlock(hMem);
     pStream->Release();
 	GlobalFree(hMem);
@@ -364,7 +413,7 @@ int LockMachine()
         TRACE("Thread id = %u\n", tid);
     }
     CPacket packet(CMD_UNLOCK_MACHINE, NULL, 0);
-    CServerSocket::GetInstance()->Send(packet);
+    pServer->Send(packet);
     return 0;
 }
 
@@ -374,7 +423,7 @@ int UnlockMachine()
 	PostThreadMessage(tid, WM_KEYDOWN, VK_ESCAPE, 0x00010001);
     // send back to client
     CPacket packet(CMD_UNLOCK_MACHINE, NULL, 0);
-    CServerSocket::GetInstance()->Send(packet);
+    pServer->Send(packet);
     return 0;
 }
 
@@ -386,6 +435,7 @@ int ExecuteCommand(int nCmd)
         case CMD_DIR: return MakeDirectoryInfo();
         case CMD_RUN_FILE: return RunFile();
         case CMD_DLD_FILE: return DownloadFile();
+        case CMD_DEL_FILE: return DelFile();
         case CMD_MOUSE: return MouseEvent();
         case CMD_SEND_SCREEN: return SendScreen();
         case CMD_LOCK_MACHINE:return LockMachine();
@@ -414,7 +464,7 @@ int main()
         {
 #if 1
             // global variable, only one instance
-            CServerSocket* pServer = CServerSocket::GetInstance();
+            pServer = CServerSocket::GetInstance();
             int count = 0;
             while (pServer)
             {
