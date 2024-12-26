@@ -37,7 +37,10 @@ public:
 	CString m_port;
 	afx_msg void OnBnClickedBtnFileinfo();
 private:
-	int SendCommandPacket(int nCmd, BYTE* pData = NULL, size_t nLength = 0);
+	int SendCommandPacket(int nCmd, BOOL autoclose = TRUE, BYTE* pData = NULL, size_t nLength = 0);
+	CString GetPath(HTREEITEM hTree);
+	void DeleteTreeChildrenItem(HTREEITEM hTree);
 public:
 	CTreeCtrl m_tree;
+	afx_msg void OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult);
 };

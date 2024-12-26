@@ -160,16 +160,6 @@ int CServerSocket::DealCommand()
 	size_t index = 0;
 	while (TRUE)
 	{
-		// if client disconnect, during recving msg.
-		if (m_client == INVALID_SOCKET)
-		{
-			TRACE("Client is not connected, waiting for retry");
-			while (!AcceptClient())
-			{
-				Sleep(1000);
-			}
-		}
-		TRACE("Client conncted");
 		size_t len = recv(m_client, buf + index, BUF_SIZE - index, 0);
 		if (len < 0)
 		{
