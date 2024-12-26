@@ -123,7 +123,7 @@ int MakeDirectoryInfo()
         memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
         CPacket packet(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
         pServer->Send(packet); // NONBLOCK
-        TRACE("Server Send filename id : [%d], name: [%s], HasNext: [%d]\r\n", ++id, fdata.name, finfo.HasNext);
+        //TRACE("Server Send filename id : [%d], name: [%s], HasNext: [%d]\r\n", ++id, fdata.name, finfo.HasNext);
         // it will blow up the buffer of client
         // using ack or sleep
         Sleep(10);
