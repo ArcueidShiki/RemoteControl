@@ -65,6 +65,8 @@ void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_IPAddress(pDX, IDC_IPADDRESS_SERV, m_server_address);
 	DDX_Text(pDX, IDC_EDIT_PORT, m_port);
 	DDX_Control(pDX, IDC_TREE_DIR, m_tree);
+	DDX_Control(pDX, IDC_LIST_FILE, m_list);
+	DDX_Control(pDX, IDC_LIST_FILE, m_list);
 }
 
 BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
@@ -74,6 +76,8 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BTN_TEST, &CRemoteClientDlg::OnBnClickedBtnTest)
 	ON_BN_CLICKED(IDC_BTN_FILEINFO, &CRemoteClientDlg::OnBnClickedBtnFileinfo)
 	ON_NOTIFY(NM_DBLCLK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMDblclkTreeDir)
+	ON_NOTIFY(NM_CLICK, IDC_TREE_DIR, &CRemoteClientDlg::OnNMClickTreeDir)
+	ON_NOTIFY(NM_RCLICK, IDC_LIST_FILE, &CRemoteClientDlg::OnNMRClickListFile)
 END_MESSAGE_MAP()
 
 
@@ -263,13 +267,12 @@ void CRemoteClientDlg::DeleteTreeChildrenItem(HTREEITEM hTree)
 	} while (hSub);
 }
 
-void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
+void CRemoteClientDlg::LoadFileInfo()
 {
-	*pResult = 0;
 	CPoint ptMouse;
 	GetCursorPos(&ptMouse); // global point to screen
 	m_tree.ScreenToClient(&ptMouse); // screen to client
-	HTREEITEM hTreeSelected= m_tree.HitTest(ptMouse, 0);
+	HTREEITEM hTreeSelected = m_tree.HitTest(ptMouse, 0);
 	if (hTreeSelected == NULL)
 	{
 		TRACE("No Item Selected\n");
@@ -280,6 +283,7 @@ void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 		return; // no child, no directory, this is a file clicked
 	}
 	DeleteTreeChildrenItem(hTreeSelected);
+	m_list.DeleteAllItems();
 	auto pClient = CClientSocket::GetInstance();
 	CString strPath = GetPath(hTreeSelected);
 	CT2A asciiPath(strPath);
@@ -291,18 +295,18 @@ void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 	int id = 0;
 	while (pInfo->HasNext)
 	{
-		TRACE("Client receive file id: [%d], name: [%s] Has Next: [%d] \n", ++id, pInfo->szFileName, pInfo->HasNext);
+		//TRACE("Client receive file id: [%d], name: [%s] Has Next: [%d] \n", ++id, pInfo->szFileName, pInfo->HasNext);
 		if (!pInfo->IsDirectory)
 		{
 			// FILE
-			TRACE("Insert file:%s\n", pInfo->szFileName);
-			m_tree.InsertItem(CString(pInfo->szFileName), hTreeSelected, TVI_LAST);
+			//TRACE("Insert file:%s\n", pInfo->szFileName);
+			m_list.InsertItem(0, CString(pInfo->szFileName));
 		}
 		else if (strcmp(pInfo->szFileName, ".") && strcmp(pInfo->szFileName, ".."))
 		{
 			// Directory not . or .., NORMAL Dir.
 			HTREEITEM hCur = m_tree.InsertItem(CString(pInfo->szFileName), hTreeSelected, TVI_LAST);
-			TRACE("Insert Directory:%s\n", pInfo->szFileName);
+			//TRACE("Insert Directory:%s\n", pInfo->szFileName);
 			m_tree.InsertItem(L"", hCur, TVI_LAST);
 		}
 		int cmd = pClient->DealCommand();
@@ -310,4 +314,37 @@ void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 		pInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
 	}
 	pClient->CloseSocket();
+}
+
+void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	*pResult = 0;
+	LoadFileInfo();
+}
+
+
+void CRemoteClientDlg::OnNMClickTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	*pResult = 0;
+	LoadFileInfo();
+}
+
+
+void CRemoteClientDlg::OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
+	*pResult = 0;
+	CPoint ptMouse, ptList;
+	GetCursorPos(&ptMouse);
+	ptList = ptMouse;
+	m_list.ScreenToClient(&ptList);
+	int ListSelected = m_list.HitTest(ptList);
+	if (ListSelected < 0) return;
+	CMenu menu;
+	menu.LoadMenu(IDR_MENU_RCLICK);
+	CMenu *pPopup = menu.GetSubMenu(0);
+	if (pPopup)
+	{
+		pPopup->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, ptMouse.x, ptMouse.y, this);
+	}
 }
