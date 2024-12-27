@@ -17,6 +17,7 @@ CClientSocket::CClientSocket()
 		exit(0);
 	}
 	m_buf.resize(BUF_SIZE);
+	memset(m_buf.data(), 0, BUF_SIZE);
 }
 
 CClientSocket::CClientSocket(const CClientSocket& other)
@@ -152,24 +153,37 @@ int CClientSocket::DealCommand()
 		TRACE("Allocate Memory failed\n");
 		return -2;
 	}
-	memset(buf, 0, BUF_SIZE);
-	int index = 0;
+	//memset(buf, 0, BUF_SIZE);
+	// if the buffer has data left over remains to read, index is indicating the start point of receiving position
+	static int index = 0;
 	while (TRUE)
 	{
-		size_t len = recv(m_socket, buf + index, BUF_SIZE - index, 0);
-		if (len <= 0)
+		char* start = buf + index;
+		int buf_available = BUF_SIZE - index;
+		int n_recv = recv(m_socket, start, buf_available, 0);
+		if (n_recv <= 0 && index == 0)
 		{
+			// not receiving and used over.
 			return -1;
 		}
-		index += (int)len;
-		len = index;
-		m_packet = CPacket((BYTE*)buf, len);
-		if (len > 0)
+		// update new position
+		if (n_recv > 0)
+			index += n_recv;
+		// update unread bytes len in buffer.
+		size_t n_parsed = index;
+		// n_parsed here is how many bytes are used for form a full packet
+		// if the packet is incomplete to parse, the n_parsed will be set 0, going to next round of receiving
+		m_packet = CPacket((BYTE*)buf, n_parsed);
+		if (int(n_parsed) > 0)
 		{
+			// a complete packet parse success.
 			// move unparse bytes leftover to head of buffer(parsed bytes),
-			memmove(buf, buf + len, BUF_SIZE - len);
+			// overwrite the used len bytes buffer area
+			char* unparse_pos = buf + n_parsed;
+			int n_unparse = int(index - n_parsed);
+			memmove(buf, unparse_pos, n_unparse);
 			// after moving, the unused spacec for receiving data
-			index -= (int)len;
+			index -= (int)n_parsed;
 			return m_packet.sCmd;
 		}
 	}
