@@ -153,7 +153,6 @@ int CClientSocket::DealCommand()
 		TRACE("Allocate Memory failed\n");
 		return -2;
 	}
-	//memset(buf, 0, BUF_SIZE);
 	// if the buffer has data left over remains to read, index is indicating the start point of receiving position
 	static int index = 0;
 	while (TRUE)
