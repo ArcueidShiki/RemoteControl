@@ -47,8 +47,6 @@ END_MESSAGE_MAP()
 
 // CRemoteClientDlg dialog
 
-
-
 CRemoteClientDlg::CRemoteClientDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_REMOTECLIENT_DIALOG, pParent)
 	, m_server_address(0)
@@ -232,12 +230,8 @@ int CRemoteClientDlg::SendCommandPacket(int nCmd, BOOL autoclose, BYTE* pData, s
 		TRACE("Get Return msg from server failed: ret = %d\r\n", ret);
 		return -1;
 	}
-	CPacket ack(CMD_ACK, NULL, 0);
-	pClient->Send(ack);
 	if (autoclose)
 	{
-		CPacket ack(CMD_ACK, NULL, 0);
-		pClient->Send(ack);
 		pClient->CloseSocket();
 	}
 	return nCmd;
@@ -317,8 +311,6 @@ void CRemoteClientDlg::LoadDirectory()
 		if (cmd < 0) break;
 		pInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
 	}
-	CPacket ack(CMD_ACK, NULL, 0);
-	pClient->Send(ack);
 }
 
 void CRemoteClientDlg::LoadFiles()
@@ -347,8 +339,6 @@ void CRemoteClientDlg::LoadFiles()
 		if (cmd < 0) break;
 		pInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
 	}
-	CPacket ack(CMD_ACK, NULL, 0);
-	pClient->Send(ack);
 }
 
 void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
@@ -447,9 +437,6 @@ void CRemoteClientDlg::OnDownloadFile()
 			fwrite(data.c_str(), 1, data.size(), pFile);
 		}
 		fclose(pFile);
-		CPacket ack(CMD_ACK, NULL, 0);
-		pClient->Send(ack);
-		//pClient->CloseSocket();
 	}
 }
 

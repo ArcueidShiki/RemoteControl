@@ -72,13 +72,6 @@ int MakeDriverInfo()
     return 0;
 }
 
-void Ack()
-{
-    while (pServer->DealCommand() != CMD_ACK)
-    {
-    }
-}
-
 /**
 * Lookup directories
 */
@@ -156,7 +149,6 @@ int DownloadFile()
     // Or property->C/C++->preprocessor->_CRT_SECURE_NO_WARNINGS
     // Or #pragma warning(disable:4996)
     errno_t err = fopen_s(&pFile, strPath.c_str(), "rb");
-    // TODO this logic is different
     if (err != 0)
     {
 		CPacket packet(CMD_DLD_FILE, (BYTE*)&size, sizeof(size));
@@ -172,11 +164,6 @@ int DownloadFile()
         TRACE("Server Filename:[%s], size:[%lld]\n", strPath.c_str(), size);
         CPacket head(CMD_DLD_FILE, (BYTE*)&size, sizeof(size));
         pServer->Send(head);
-		if (pServer->DealCommand() != CMD_ACK)
-		{
-			TRACE("Client ACK failed\n");
-			return -1;
-		}
         fseek(pFile, 0, SEEK_SET);
         char buf[DLD_BUF_SIZE] = "";
         size_t rlen = 0;
@@ -184,15 +171,7 @@ int DownloadFile()
             rlen = fread(buf, 1, DLD_BUF_SIZE, pFile);
             CPacket packet(CMD_DLD_FILE, (BYTE*)buf, rlen);
             pServer->Send(packet);
-            if (pServer->DealCommand() != CMD_ACK)
-            {
-                TRACE("Client ACK failed\n");
-                return -1;
-            }
         } while (rlen >= DLD_BUF_SIZE);
-        // finish
-        //CPacket packet(CMD_DLD_FILE, NULL, 0);
-        //pServer->Send(packet); // wait for client ack.
         fclose(pFile);
     }
 	return 0;
@@ -493,8 +472,7 @@ int main()
                 }
 				//TRACE("Execute Command : %d, Success\n", cmd);
                 //CPacket reply(ret, NULL, 0);
-				//pServer->Send(reply);
-                Ack();
+				//pServer->Send(reply); Really Need?
                 // short connection. FTP usually use long connection
                 pServer->CloseClient();
             }
