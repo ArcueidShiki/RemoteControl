@@ -118,10 +118,10 @@ int MakeDirectoryInfo()
         memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
         CPacket packet(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
         pServer->Send(packet); // NONBLOCK
-        //TRACE("Server Send filename id : [%d], name: [%s], HasNext: [%d]\r\n", ++id, fdata.name, finfo.HasNext);
+        TRACE("Server Send filename id : [%d], name: [%s], HasNext: [%d]\r\n", ++id, fdata.name, finfo.HasNext);
         // it will blow up the buffer of client
         // using ack or sleep
-        Sleep(10);
+        //Sleep(10);
         ret = _findnext(hfind, &fdata);
     } while (ret == 0);
     // when tmpfiles or logfiles, are huge, so send one file every time read.
@@ -492,8 +492,9 @@ int main()
 					TRACE("Execute Command failed: cmd = %d, ret = %d\n", cmd, ret);
                 }
 				//TRACE("Execute Command : %d, Success\n", cmd);
-                CPacket reply(ret, NULL, 0);
-				pServer->Send(reply);
+                //CPacket reply(ret, NULL, 0);
+				//pServer->Send(reply);
+                Ack();
                 // short connection. FTP usually use long connection
                 pServer->CloseClient();
             }

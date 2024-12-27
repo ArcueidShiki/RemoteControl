@@ -236,6 +236,8 @@ int CRemoteClientDlg::SendCommandPacket(int nCmd, BOOL autoclose, BYTE* pData, s
 	pClient->Send(ack);
 	if (autoclose)
 	{
+		CPacket ack(CMD_ACK, NULL, 0);
+		pClient->Send(ack);
 		pClient->CloseSocket();
 	}
 	return nCmd;
@@ -297,7 +299,7 @@ void CRemoteClientDlg::LoadDirectory()
 	int id = 0;
 	while (pInfo->HasNext)
 	{
-		//TRACE("Client receive file id: [%d], name: [%s] Has Next: [%d] \n", ++id, pInfo->szFileName, pInfo->HasNext);
+		TRACE("Client receive file id: [%d], name: [%s] Has Next: [%d] \n", ++id, pInfo->szFileName, pInfo->HasNext);
 		if (!pInfo->IsDirectory)
 		{
 			// FILE
@@ -315,6 +317,8 @@ void CRemoteClientDlg::LoadDirectory()
 		if (cmd < 0) break;
 		pInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
 	}
+	CPacket ack(CMD_ACK, NULL, 0);
+	pClient->Send(ack);
 }
 
 void CRemoteClientDlg::LoadFiles()
@@ -343,6 +347,8 @@ void CRemoteClientDlg::LoadFiles()
 		if (cmd < 0) break;
 		pInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
 	}
+	CPacket ack(CMD_ACK, NULL, 0);
+	pClient->Send(ack);
 }
 
 void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
@@ -441,6 +447,8 @@ void CRemoteClientDlg::OnDownloadFile()
 			fwrite(data.c_str(), 1, data.size(), pFile);
 		}
 		fclose(pFile);
+		CPacket ack(CMD_ACK, NULL, 0);
+		pClient->Send(ack);
 		//pClient->CloseSocket();
 	}
 }
