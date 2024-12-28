@@ -213,73 +213,64 @@ int DelFile()
 
 int MouseEvent()
 {
-#define MOVE 0x00
-#define LEFT 0x01
-#define RIGHT 0x02
-#define MIDDLE 0x04
-#define CLICK 0x08
-#define DBCLICK 0x10
-#define DOWN 0x20
-#define UP 0x40
-
     MOUSEEV mouse;
     if (pServer->GetMouseEvent(mouse))
     {
         DWORD operation = mouse.nButton;
-        if (operation != MOVE)
+        if (operation != MOUSE_MOVE)
 			SetCursorPos(mouse.point.x, mouse.point.y);
         operation |= mouse.nAction;
         switch (operation)
         {
-		    case LEFT | CLICK:
+		    case MOUSE_LEFT | MOUSE_CLICK:
 			    mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
 			    mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
 			    break;
-		    case LEFT | DBCLICK:
+		    case MOUSE_LEFT | MOUSE_DBCLICK:
                 mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
                 mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
                 mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
                 mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
 			    break;
-		    case LEFT | DOWN:
+		    case MOUSE_LEFT | MOUSE_DOWN:
 			    mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
 			    break;
-		    case LEFT | UP:
+		    case MOUSE_LEFT | MOUSE_UP:
 			    mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
 			    break;
-		    case RIGHT | CLICK:
+		    case MOUSE_RIGHT | MOUSE_CLICK:
 			    mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
 			    mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
 			    break;
-		    case RIGHT | DBCLICK:
+		    case MOUSE_RIGHT | MOUSE_DBCLICK:
 			    mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
 			    mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
 			    mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
 			    mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
 			    break;
-		    case RIGHT | DOWN:
+		    case MOUSE_RIGHT | MOUSE_DOWN:
 			    mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, GetMessageExtraInfo());
 			    break;
-		    case RIGHT | UP:
+		    case MOUSE_RIGHT | MOUSE_UP:
 			    mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, GetMessageExtraInfo());
 			    break;
-		    case MIDDLE | CLICK:
+		    case MOUSE_MIDDLE | MOUSE_CLICK:
 			    mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
 			    mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
 			    break;
-		    case MIDDLE | DBCLICK:
+		    case MOUSE_MIDDLE | MOUSE_DBCLICK:
 			    mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
 			    mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
 			    mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
 			    mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
 			    break;
-		    case MIDDLE | DOWN:
+		    case MOUSE_MIDDLE | MOUSE_DOWN:
 			    mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, GetMessageExtraInfo());
 			    break;
-		    case MIDDLE | UP:
+		    case MOUSE_MIDDLE | MOUSE_UP:
 			    mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, GetMessageExtraInfo());
 			    break;
-		    case MOVE:
+		    case MOUSE_MOVE:
 				mouse_event(MOUSEEVENTF_MOVE, mouse.point.x, mouse.point.y, 0, GetMessageExtraInfo());
         }
         CPacket packet(CMD_MOUSE, NULL, 0);

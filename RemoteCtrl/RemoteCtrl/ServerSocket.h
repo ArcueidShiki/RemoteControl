@@ -2,19 +2,7 @@
 #include "pch.h"
 #include "framework.h"
 #include "Packet.h"
-
-typedef struct MouseEvent{
-	MouseEvent()
-	{
-		nAction = 0;
-		nButton = -1;
-		point.x = 0;
-		point.y = 0;
-	}
-	WORD nAction; // move, click, double click
-	WORD nButton; // left, middle, right
-	POINT point;
-} MOUSEEV, *PMOUSEEV;
+#include "Mouse.h"
 
 typedef struct file_info {
 	file_info()

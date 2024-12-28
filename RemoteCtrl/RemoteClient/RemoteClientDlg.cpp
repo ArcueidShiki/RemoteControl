@@ -470,7 +470,7 @@ void CRemoteClientDlg::ThreadWatchData()
 			Sleep(1);
 			continue;
 		}
-		int ret = SendMessage(WM_SEND_PACKET, CMD_SEND_SCREEN << 1, 0);
+		LRESULT ret = SendMessage(WM_SEND_PACKET, CMD_SEND_SCREEN << 1, 0);
 		if (ret == CMD_SEND_SCREEN)
 		{
 			if (!m_isFull)
@@ -588,7 +588,7 @@ void CRemoteClientDlg::OnOpenFile()
 LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)
 {
 	int ret = 0;
-	int cmd = wParam >> 1;
+	int cmd = int(wParam >> 1);
 	BOOL autoclose = wParam & 1;
 	switch (cmd)
 	{
