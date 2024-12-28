@@ -17,11 +17,13 @@ public:
 	enum { IDD = IDD_DLG_WATCH };
 #endif
 
+public:
+	virtual BOOL OnInitDialog();
+	afx_msg void OnTimer(UINT_PTR nIDEvent);
+	CStatic m_picture;
+
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
 
 	DECLARE_MESSAGE_MAP()
-public:
-	virtual BOOL OnInitDialog();
-	afx_msg void OnTimer(UINT_PTR nIDEvent);
 };

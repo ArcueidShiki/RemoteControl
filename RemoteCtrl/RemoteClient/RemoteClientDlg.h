@@ -30,6 +30,7 @@ public:
 	afx_msg void OnBnClickedBtnStartWatch();
 	BOOL isFull() const;
 	CImage& GetImage();
+	void SetImageStatus(BOOL isFull = TRUE);
 	CListCtrl m_list;
 	CTreeCtrl m_tree;
 	CString m_port;
