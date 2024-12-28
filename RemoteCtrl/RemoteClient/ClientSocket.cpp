@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "ClientSocket.h"
 
-constexpr int BUF_SIZE = 4096;
+constexpr int BUF_SIZE = 4096000;
 
 //define and init static member outside class
 CClientSocket* CClientSocket::m_instance = NULL;

@@ -97,6 +97,11 @@ CImage& CRemoteClientDlg::GetImage()
 	return m_img;
 }
 
+void CRemoteClientDlg::SetImageStatus(BOOL isFull)
+{
+	m_isFull = isFull;
+}
+
 BOOL CRemoteClientDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
@@ -454,40 +459,42 @@ void CRemoteClientDlg::ThreadDownloadFile()
 */
 void CRemoteClientDlg::ThreadWatchData()
 {
+	Sleep(50);
 	do {
 		pClient = CClientSocket::GetInstance();
 	} while (!pClient);
 	for (;;)
 	{
-		CPacket packet(CMD_SEND_SCREEN, NULL, 0);
-		if (pClient->Send(packet))
+		if (m_isFull)
 		{
-			int cmd = pClient->DealCommand();
-			if (cmd == CMD_SEND_SCREEN)
+			Sleep(1);
+			continue;
+		}
+		int ret = SendMessage(WM_SEND_PACKET, CMD_SEND_SCREEN << 1, 0);
+		if (ret == CMD_SEND_SCREEN)
+		{
+			if (!m_isFull)
 			{
-				if (!m_isFull)
+				// update data ti cache
+				BYTE* pData = (BYTE*)pClient->GetPacket().strData.c_str();
+				HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
+				if (hMem == NULL)
 				{
-					// update data ti cache
-					BYTE* pData = (BYTE*)pClient->GetPacket().strData.c_str();
-					HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
-					if (hMem == NULL)
-					{
-						TRACE("Insufficient Memory GlobalAlloc failed\n");
-						Sleep(1);
-						continue;
-					}
-					IStream* pStream = NULL;
-					HRESULT hRet = CreateStreamOnHGlobal(hMem, TRUE, &pStream);
-					if (hRet == S_OK)
-					{
-						ULONG written = 0;
-						ULONG len = (ULONG)pClient->GetPacket().strData.size();
-						pStream->Write(pData, len, &written);
-						LARGE_INTEGER li = { 0 };
-						pStream->Seek(li, STREAM_SEEK_SET, NULL);
-						m_img.Load(pStream);
-						m_isFull = TRUE;
-					}
+					TRACE("Insufficient Memory GlobalAlloc failed\n");
+					Sleep(1);
+					continue;
+				}
+				IStream* pStream = NULL;
+				HRESULT hRet = CreateStreamOnHGlobal(hMem, TRUE, &pStream);
+				if (hRet == S_OK)
+				{
+					ULONG written = 0;
+					ULONG len = (ULONG)pClient->GetPacket().strData.size();
+					pStream->Write(pData, len, &written);
+					LARGE_INTEGER li = { 0 };
+					pStream->Seek(li, STREAM_SEEK_SET, NULL);
+					m_img.Load(pStream);
+					m_isFull = TRUE;
 				}
 			}
 		}
@@ -495,7 +502,6 @@ void CRemoteClientDlg::ThreadWatchData()
 		{
 			Sleep(1);
 		}
-
 	}
 }
 
@@ -581,16 +587,32 @@ void CRemoteClientDlg::OnOpenFile()
 
 LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)
 {
-	LPCSTR filepath = (LPCSTR)lParam;
-	// CMD, FALSE
-	int ret = SendCommandPacket(int(wParam >> 1), wParam & 1, (BYTE*)filepath, strlen(filepath));
+	int ret = 0;
+	int cmd = wParam >> 1;
+	BOOL autoclose = wParam & 1;
+	switch (cmd)
+	{
+	case CMD_DLD_FILE:
+	{
+		LPCSTR filepath = (LPCSTR)lParam;
+		ret = SendCommandPacket(cmd, autoclose, (BYTE*)lParam, strlen(filepath));
+		break;
+	}
+	case CMD_SEND_SCREEN:
+	{
+		ret = SendCommandPacket(cmd, autoclose);
+		break;
+	}
+	default:
+		ret = -1;
+	}
 	return ret;
 }
 
 void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 {
+	CWatchDlg dlg(this);
 	_beginthread(CRemoteClientDlg::ThreadEntryWatchData, 0, this);
 	//GetDlgItem(IDC_BTN_START_WATCH)->EnableWindow(FALSE);
-	CWatchDlg dlg(this);
 	dlg.DoModal();
 }
