@@ -7,3 +7,8 @@
 5. git push -f origin currentBranch
 6. if directly using git rebase origin/main, you cannot create a pull request, it will automatically rebase to the remtoe reposiotry.
 7. origin/main is the "local" ref to "remote" origin main. git pull origin/main will upadte from local branch named "origin/main"; git pull origin main, will fetch first, to ensure local origin/main updated.
+
+# TODO 
+1. Hanlde Thread close when close watchdlg
+2. Should be tested on vmware window >= 10
+3. network communication should be decoupled with dlg UI.
