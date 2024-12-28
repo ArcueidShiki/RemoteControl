@@ -23,7 +23,6 @@ public:
 	protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 
-
 // Implementation
 protected:
 	HICON m_hIcon;
@@ -46,8 +45,12 @@ private:
 	void LoadDirectory();
 	void LoadFiles();
 	static void ThreadEntryDownloadFile(void* arg);
+	static void ThreadEntryWatchData(void* arg);
 	void ThreadDownloadFile();
+	void ThreadWatchData();
 	CClientSocket* pClient;
+	CImage m_img;	// cache
+	BOOL m_isFull;
 public:
 	CTreeCtrl m_tree;
 	afx_msg void OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult);

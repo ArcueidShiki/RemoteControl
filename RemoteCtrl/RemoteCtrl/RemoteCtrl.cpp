@@ -199,7 +199,7 @@ int DelFile()
     TRACE("Converted path: %ws\n", sPath);
 	memset(sPath, 0, MAX_PATH);
     // This success
-    MultiByteToWideChar(CP_ACP, 0, strPath.c_str(), strPath.size(), sPath, MAX_PATH);
+    MultiByteToWideChar(CP_ACP, 0, strPath.c_str(), (int)strPath.size(), sPath, MAX_PATH);
     if (!DeleteFileW(sPath))
     {
 		TRACE("DeleteFileW failed, error code: %d\n", GetLastError());
