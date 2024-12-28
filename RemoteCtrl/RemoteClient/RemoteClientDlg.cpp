@@ -119,7 +119,7 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	UpdateData(FALSE);
 	m_dlgStatus.Create(IDD_DLG_STATUS, this);
 	m_dlgStatus.ShowWindow(SW_HIDE);
-
+	m_isFull = FALSE;
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -351,6 +351,13 @@ void CRemoteClientDlg::ThreadEntryDownloadFile(void* arg)
 	_endthread();
 }
 
+void CRemoteClientDlg::ThreadEntryWatchData(void* arg)
+{
+	CRemoteClientDlg* pThis = (CRemoteClientDlg*)arg;
+	pThis->ThreadWatchData();
+	_endthread();
+}
+
 void CRemoteClientDlg::ThreadDownloadFile()
 {
 	int nListSelected = m_list.GetSelectionMark();
@@ -428,6 +435,38 @@ void CRemoteClientDlg::ThreadDownloadFile()
 	m_dlgStatus.ShowWindow(SW_HIDE);
 	EndWaitCursor();
 	MessageBox(_T("Download File Success"), _T("Download Finish"));
+}
+
+/**
+* Receiving data from server
+*/
+void CRemoteClientDlg::ThreadWatchData()
+{
+	do {
+		pClient = CClientSocket::GetInstance();
+	} while (!pClient);
+	for (;;)
+	{
+		CPacket packet(CMD_SEND_SCREEN, NULL, 0);
+		if (pClient->Send(packet))
+		{
+			int cmd = pClient->DealCommand();
+			if (cmd == CMD_SEND_SCREEN)
+			{
+				if (!m_isFull)
+				{
+					BYTE* pData = (BYTE*)pClient->GetPacket().strData.c_str();
+					// TODO save CImage to cache
+					m_isFull = TRUE;
+				}
+			}
+		}
+		else
+		{
+			Sleep(1);
+		}
+
+	}
 }
 
 void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
@@ -514,7 +553,6 @@ LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)
 {
 	LPCSTR filepath = (LPCSTR)lParam;
 	// CMD, FALSE
-	int ret = SendCommandPacket(wParam >> 1, wParam & 1, (BYTE*)filepath, strlen(filepath));
+	int ret = SendCommandPacket(int(wParam >> 1), wParam & 1, (BYTE*)filepath, strlen(filepath));
 	return ret;
 }
-
