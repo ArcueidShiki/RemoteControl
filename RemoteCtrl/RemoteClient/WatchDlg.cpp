@@ -27,7 +27,6 @@ void CWatchDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_WATCH, m_picture);
 }
 
-
 BEGIN_MESSAGE_MAP(CWatchDlg, CDialog)
 	ON_WM_TIMER()
 	ON_WM_LBUTTONDBLCLK()
@@ -40,19 +39,18 @@ BEGIN_MESSAGE_MAP(CWatchDlg, CDialog)
 	ON_STN_CLICKED(IDC_WATCH, &CWatchDlg::OnStnClickedWatch)
 END_MESSAGE_MAP()
 
-
 // CWatchDlg message handlers
 
-
-CPoint CWatchDlg::UserPoint2RemoteScreen(CPoint& pt)
+CPoint CWatchDlg::UserPoint2RemoteScreen(CPoint& pt, BOOL isScreen/* = FALSE*/)
 {
 	CRect clientRect;
-	ScreenToClient(&pt);
+	if (isScreen) ScreenToClient(&pt);
+	TRACE("%s x:%d, y:d\n", __FUNCTION__, pt.x, pt.y);
 	m_picture.GetWindowRect(&clientRect);
 	// local coordinate to remote screen coordinate
-	int x = pt.x * 3440 / clientRect.Width();
-	int y = pt.y * 1440 / clientRect.Height();
-
+	int x = pt.x * 1920 / clientRect.Width();
+	int y = pt.y * 1080 / clientRect.Height();
+	TRACE("%s 2 x:%d, y:d\n", __FUNCTION__,x, y);
 	return CPoint(x, y);
 }
 
@@ -65,7 +63,6 @@ BOOL CWatchDlg::OnInitDialog()
 	return TRUE;  // return TRUE unless you set the focus to a control
 	// EXCEPTION: OCX Property Pages should return FALSE
 }
-
 
 void CWatchDlg::OnTimer(UINT_PTR nIDEvent)
 {
@@ -86,91 +83,73 @@ void CWatchDlg::OnTimer(UINT_PTR nIDEvent)
 	CDialog::OnTimer(nIDEvent);
 }
 
+// Should be tested on vmware window >= 10
+// network communication should be decoupled with dlg UI.
 
 void CWatchDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 {
 	CPoint remote = UserPoint2RemoteScreen(point);
 	// POINT is tagPOINT: the parent of CPoint
 	MOUSEEV event(MOUSE_LEFT, MOUSE_DBCLICK, remote);
-	CPacket packet(CMD_MOUSE, (BYTE*)&event, sizeof(MOUSEEV));
-	pClient->Send(packet);
+	(CRemoteClientDlg*)m_pParentWnd->SendMessage(WM_SEND_PACKET, CMD_MOUSE << 1 | TRUE, (WPARAM)&event);
 	CDialog::OnLButtonDblClk(nFlags, point);
 }
 
-
 void CWatchDlg::OnLButtonDown(UINT nFlags, CPoint point)
 {
-	//CPoint remote = UserPoint2RemoteScreen(point);
-	//// POINT is tagPOINT: the parent of CPoint
-	//MOUSEEV event(LEFT, DOWN, remote);
-	//CPacket packet(CMD_MOUSE, (BYTE*)&event, sizeof(MOUSEEV));
-	//pClient->Send(packet);
+	TRACE("x:%d, y:d\n", point.x, point.y);
+	CPoint remote = UserPoint2RemoteScreen(point);
+	TRACE("remote: x:%d, y:d\n", remote.x, remote.y);
+	MOUSEEV event(MOUSE_LEFT, MOUSE_DOWN, remote);
+	(CRemoteClientDlg*)m_pParentWnd->SendMessage(WM_SEND_PACKET, CMD_MOUSE << 1 | TRUE, (WPARAM)&event);
 	CDialog::OnLButtonDown(nFlags, point);
 }
 
-
 void CWatchDlg::OnLButtonUp(UINT nFlags, CPoint point)
 {
-	//CPoint remote = UserPoint2RemoteScreen(point);
-	//// POINT is tagPOINT: the parent of CPoint
-	//MOUSEEV event(LEFT, UP, remote);
-	//CPacket packet(CMD_MOUSE, (BYTE*)&event, sizeof(MOUSEEV));
-	//pClient->Send(packet);
+	CPoint remote = UserPoint2RemoteScreen(point);
+	MOUSEEV event(MOUSE_LEFT, MOUSE_UP, remote);
+	(CRemoteClientDlg*)m_pParentWnd->SendMessage(WM_SEND_PACKET, CMD_MOUSE << 1 | TRUE, (WPARAM)&event);
 	CDialog::OnLButtonUp(nFlags, point);
 }
-
 
 void CWatchDlg::OnRButtonDblClk(UINT nFlags, CPoint point)
 {
 	CPoint remote = UserPoint2RemoteScreen(point);
-	// POINT is tagPOINT: the parent of CPoint
 	MOUSEEV event(MOUSE_RIGHT, MOUSE_DBCLICK, remote);
-	CPacket packet(CMD_MOUSE, (BYTE*)&event, sizeof(MOUSEEV));
-	pClient->Send(packet);
+	(CRemoteClientDlg*)m_pParentWnd->SendMessage(WM_SEND_PACKET, CMD_MOUSE << 1 | TRUE, (WPARAM)&event);
 	CDialog::OnRButtonDblClk(nFlags, point);
 }
-
 
 void CWatchDlg::OnRButtonDown(UINT nFlags, CPoint point)
 {
 	CPoint remote = UserPoint2RemoteScreen(point);
-	// POINT is tagPOINT: the parent of CPoint
 	MOUSEEV event(MOUSE_RIGHT, MOUSE_DOWN, remote);
-	CPacket packet(CMD_MOUSE, (BYTE*)&event, sizeof(MOUSEEV));
-	pClient->Send(packet);
+	(CRemoteClientDlg*)m_pParentWnd->SendMessage(WM_SEND_PACKET, CMD_MOUSE << 1 | TRUE, (WPARAM)&event);
 	CDialog::OnRButtonDown(nFlags, point);
 }
-
 
 void CWatchDlg::OnRButtonUp(UINT nFlags, CPoint point)
 {
 	CPoint remote = UserPoint2RemoteScreen(point);
-	// POINT is tagPOINT: the parent of CPoint
 	MOUSEEV event(MOUSE_RIGHT, MOUSE_UP, remote);
-	CPacket packet(CMD_MOUSE, (BYTE*)&event, sizeof(MOUSEEV));
-	pClient->Send(packet);
+	(CRemoteClientDlg*)m_pParentWnd->SendMessage(WM_SEND_PACKET, CMD_MOUSE << 1 | TRUE, (WPARAM)&event);
 	CDialog::OnRButtonUp(nFlags, point);
 }
-
 
 void CWatchDlg::OnMouseMove(UINT nFlags, CPoint point)
 {
 	CPoint remote = UserPoint2RemoteScreen(point);
-	// POINT is tagPOINT: the parent of CPoint
 	MOUSEEV event(MOUSE_MOVE, MOUSE_MOVE, remote);
-	CPacket packet(CMD_MOUSE, (BYTE*)&event, sizeof(MOUSEEV));
-	pClient->Send(packet);
+	(CRemoteClientDlg*)m_pParentWnd->SendMessage(WM_SEND_PACKET, CMD_MOUSE << 1 | TRUE, (WPARAM)&event);
 	CDialog::OnMouseMove(nFlags, point);
 }
-
 
 void CWatchDlg::OnStnClickedWatch()
 {
 	CPoint pt;
 	GetCursorPos(&pt);
-	CPoint remote = UserPoint2RemoteScreen(pt);
-	// POINT is tagPOINT: the parent of CPoint
+	CPoint remote = UserPoint2RemoteScreen(pt, TRUE);
 	MOUSEEV event(MOUSE_LEFT, MOUSE_DOWN, remote);
-	CPacket packet(CMD_MOUSE, (BYTE*)&event, sizeof(MOUSEEV));
-	pClient->Send(packet);
+	(CRemoteClientDlg*)m_pParentWnd->SendMessage(WM_SEND_PACKET, CMD_MOUSE << 1 | TRUE, (WPARAM)&event);
 }

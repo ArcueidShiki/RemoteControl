@@ -220,6 +220,7 @@ int MouseEvent()
         if (operation != MOUSE_MOVE)
 			SetCursorPos(mouse.point.x, mouse.point.y);
         operation |= mouse.nAction;
+		TRACE("Mouse operation: %08X, x: %d, y: %d\n", operation, mouse.point.x, mouse.point.y);
         switch (operation)
         {
 		    case MOUSE_LEFT | MOUSE_CLICK:
