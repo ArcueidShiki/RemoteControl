@@ -340,9 +340,19 @@ unsigned __stdcall ThreadLockDlg(void* arg)
     rect.left = 0;
     rect.top = 0;
     rect.right = GetSystemMetrics(SM_CXSCREEN); // same as GetDeviceCaps( hdcPrimaryMonitor, HORZRES)
-    rect.bottom = GetSystemMetrics(SM_CYSCREEN) - 40; // same as GetDeviceCaps( hdcPrimaryMonitor, VERTRES)
+    rect.bottom = LONG(GetSystemMetrics(SM_CYSCREEN) * 1.1); // same as GetDeviceCaps( hdcPrimaryMonitor, VERTRES)
     TRACE("right = %d, bottom = %d\n", rect.right, rect.bottom);
     dlg.MoveWindow(&rect);
+    CWnd* pText = dlg.GetDlgItem(IDC_STATIC);
+    if (pText)
+    {
+        CRect rtText;
+        // you are actually passing a reference to the object. In C++, when you pass an object to a function that expects a pointer, the compiler automatically converts the object to a pointer to its first member. Since CRect inherits from RECT, this conversion is straightforward.
+        pText->GetWindowRect(&rtText);
+        int x = (rect.right - rtText.Width()) / 2;
+        int y = (rect.bottom - rtText.Height()) / 2;
+		pText->MoveWindow(x, y, rtText.Width(), rtText.Height());
+    }
     //dlg.GetWindowRect(&rect);
     ClipCursor(&rect); // restrict mouse move range.
     MSG msg;
@@ -368,6 +378,7 @@ unsigned __stdcall ThreadLockDlg(void* arg)
     // modal dlg: can not handle other window.
     dlg.DoModal();
 #endif
+	ClipCursor(NULL);
     ShowCursor(TRUE);
     // hide task bar
     _endthreadex(0);

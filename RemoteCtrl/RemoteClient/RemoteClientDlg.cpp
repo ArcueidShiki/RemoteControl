@@ -600,14 +600,16 @@ LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)
 		ret = SendCommandPacket(cmd, autoclose, (BYTE*)lParam, strlen(filepath));
 		break;
 	}
-	case CMD_SEND_SCREEN:
-	{
-		ret = SendCommandPacket(cmd, autoclose);
-		break;
-	}
 	case CMD_MOUSE:
 	{
 		ret = SendCommandPacket(cmd, autoclose, (BYTE*)lParam, sizeof(MOUSEEV));
+		break;
+	}
+	case CMD_SEND_SCREEN:
+	case CMD_LOCK_MACHINE:
+	case CMD_UNLOCK_MACHINE:
+	{
+		ret = SendCommandPacket(cmd, autoclose);
 		break;
 	}
 	default:
