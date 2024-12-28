@@ -29,6 +29,7 @@ public:
 	afx_msg void OnRButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnStnClickedWatch();
+	void OnOK();
 	CStatic m_picture;
 
 protected:
@@ -37,4 +38,6 @@ protected:
 	DECLARE_MESSAGE_MAP()
 private:
 	CClientSocket* pClient;
+	int m_nRemoteWidth;
+	int m_nRemoteHeight;
 };

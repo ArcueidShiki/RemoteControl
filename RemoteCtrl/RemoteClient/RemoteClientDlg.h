@@ -60,4 +60,5 @@ private:
 	CClientSocket* pClient;
 	CImage m_img;
 	BOOL m_isFull;
+	BOOL m_isClosed;
 };
