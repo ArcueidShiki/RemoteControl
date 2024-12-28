@@ -78,6 +78,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_COMMAND(ID_DOWNLOAD_FILE, &CRemoteClientDlg::OnDownloadFile)
 	ON_COMMAND(ID_DELETE_FILE, &CRemoteClientDlg::OnDeleteFile)
 	ON_COMMAND(ID_OPEN_FILE, &CRemoteClientDlg::OnOpenFile)
+	ON_MESSAGE(WM_SEND_PACKET, &CRemoteClientDlg::OnSendPacket)
 END_MESSAGE_MAP()
 
 
@@ -116,6 +117,8 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	m_port = _T("10000");
 	m_server_address = 0x7F000001; // 127.0.0.1
 	UpdateData(FALSE);
+	m_dlgStatus.Create(IDD_DLG_STATUS, this);
+	m_dlgStatus.ShowWindow(SW_HIDE);
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -341,6 +344,92 @@ void CRemoteClientDlg::LoadFiles()
 	}
 }
 
+void CRemoteClientDlg::ThreadEntryDownloadFile(void* arg)
+{
+	CRemoteClientDlg* pThis = (CRemoteClientDlg*)arg;
+	pThis->ThreadDownloadFile();
+	_endthread();
+}
+
+void CRemoteClientDlg::ThreadDownloadFile()
+{
+	int nListSelected = m_list.GetSelectionMark();
+	CString strFile = m_list.GetItemText(nListSelected, 0);
+	// Need a dlg;
+	// False for Save sa, "extension", "filename", flags, filter, parent
+	CFileDialog dlg(FALSE, L"*", strFile, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, NULL, this);
+	if (dlg.DoModal() == IDOK) // need handle first, cannot move to other window
+	{
+		FILE* pFile;
+		CT2A DPath(dlg.GetPathName());
+		char* downloadPath = DPath;
+		int err = fopen_s(&pFile, downloadPath, "wb+");
+		if (err != 0 || pFile == NULL)
+		{
+			AfxMessageBox(L"Open Dlg File Failed\n");
+			TRACE("Open Download Path : [%s] Failed\n", downloadPath);
+			m_dlgStatus.ShowWindow(SW_HIDE);
+			EndWaitCursor();
+			return;
+		}
+
+		HTREEITEM hTreeSelected = m_tree.GetSelectedItem();
+		if (hTreeSelected == NULL)
+		{
+			AfxMessageBox(L"No Tree Item Selected\n");
+			TRACE("Download File Failed, No Item Selected\n");
+			m_dlgStatus.ShowWindow(SW_HIDE);
+			EndWaitCursor();
+			return;
+		}
+
+		CW2A asciiFullPath(GetPath(hTreeSelected) + strFile);
+		char* filepath = asciiFullPath;
+		size_t len = strlen(filepath);
+		TRACE("Full File Path : [%s], name len:[%zu]\n", filepath, len);
+		LRESULT ret = SendMessage(WM_SEND_PACKET, CMD_DLD_FILE << 1, (LPARAM)filepath);
+		//int ret = SendCommandPacket(CMD_DLD_FILE, FALSE, (BYTE*)filepath, len);
+		if (ret < 0)
+		{
+			AfxMessageBox(L"Donwload File Failed");
+			TRACE("Download File Failed ret = %d\n", ret);
+			m_dlgStatus.ShowWindow(SW_HIDE);
+			EndWaitCursor();
+			return;
+		}
+		auto nLength = *(long long*)pClient->GetPacket().strData.c_str();
+		if (nLength == 0)
+		{
+			AfxMessageBox(L"File size is Zero or Download File Failed");
+			TRACE("Download File Failed, File Size = 0\n");
+			m_dlgStatus.ShowWindow(SW_HIDE);
+			EndWaitCursor();
+			return;
+		}
+		TRACE("Client Filename:[%s], size:[%lld]\n", filepath, nLength);
+		long long nCount = 0;
+		while (nCount < nLength)
+		{
+			ret = pClient->DealCommand();
+			if (ret < 0)
+			{
+				AfxMessageBox(L"Transmission Failed\n");
+				TRACE("Download File Failed, Deal Command Failed ret = %d\n", ret);
+				m_dlgStatus.ShowWindow(SW_HIDE);
+				EndWaitCursor();
+				break;
+			}
+			std::string data = pClient->GetPacket().strData;
+			nCount += data.size();
+			fwrite(data.c_str(), 1, data.size(), pFile);
+		}
+		fclose(pFile);
+	}
+	m_dlgStatus.ShowWindow(SW_HIDE);
+	EndWaitCursor();
+	MessageBox(_T("Download File Success"), _T("Download Finish"));
+}
+
 void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	*pResult = 0;
@@ -374,70 +463,14 @@ void CRemoteClientDlg::OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult)
 	}
 }
 
-
 void CRemoteClientDlg::OnDownloadFile()
 {
-	int nListSelected = m_list.GetSelectionMark();
-	CString strFile = m_list.GetItemText(nListSelected, 0);
-	// Need a dlg;
-	// False for Save sa, "extension", "filename", flags, filter, parent
-	CFileDialog dlg(FALSE, L"*", strFile, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, NULL, this);
-	if (dlg.DoModal() == IDOK) // need handle first, cannot move to other window
-	{
-		FILE* pFile;
-		CT2A DPath(dlg.GetPathName());
-		char* downloadPath = DPath;
-		int err = fopen_s(&pFile, downloadPath, "wb+");
-		if (err != 0 || pFile == NULL)
-		{
-			AfxMessageBox(L"Open Dlg File Failed\n");
-			TRACE("Open Download Path : [%s] Failed\n", downloadPath);
-			return;
-		}
-
-		HTREEITEM hTreeSelected = m_tree.GetSelectedItem();
-		if (hTreeSelected == NULL)
-		{
-			AfxMessageBox(L"No Tree Item Selected\n");
-			TRACE("Download File Failed, No Item Selected\n");
-			return;
-		}
-
-		CW2A asciiFullPath(GetPath(hTreeSelected) + strFile);
-		char* filepath = asciiFullPath;
-		size_t len = strlen(filepath);
-		TRACE("Full File Path : [%s], name len:[%zu]\n", filepath, len);
-		int ret = SendCommandPacket(CMD_DLD_FILE, FALSE, (BYTE*)filepath, len);
-		if (ret < 0)
-		{
-			AfxMessageBox(L"Donwload File Failed");
-			TRACE("Download File Failed ret = %d\n", ret);
-			return;
-		}
-		auto nLength = *(long long*)pClient->GetPacket().strData.c_str();
-		if (nLength == 0)
-		{
-			AfxMessageBox(L"File size is Zero or Download File Failed");
-			TRACE("Download File Failed, File Size = 0\n");
-			return;
-		}
-		TRACE("Client Filename:[%s], size:[%lld]\n", filepath, nLength);
-		long long nCount = 0;
-		while (nCount < nLength)
-		{
-			ret = pClient->DealCommand();
-			if (ret < 0)
-			{
-				AfxMessageBox(L"Transmission Failed\n");
-				TRACE("Download File Failed, Deal Command Failed ret = %d\n", ret);
-				break;
-			}
-			std::string data = pClient->GetPacket().strData;
-			nCount += data.size();
-			fwrite(data.c_str(), 1, data.size(), pFile);
-		}
-		fclose(pFile);
-	}
+	_beginthread(CRemoteClientDlg::ThreadEntryDownloadFile, 0, this);
+	BeginWaitCursor(); // set cursort to circle represent waiting...
+	m_dlgStatus.m_info.SetWindowText(L"Downloading...");
+	m_dlgStatus.ShowWindow(SW_SHOW); // active window accept keyboard input
+	m_dlgStatus.CenterWindow();
+	m_dlgStatus.SetActiveWindow();
 }
 
 void CRemoteClientDlg::OnDeleteFile()
@@ -475,5 +508,13 @@ void CRemoteClientDlg::OnOpenFile()
 		AfxMessageBox(L"Open File Failed");
 		TRACE("Open File Failed, ret = %d\n", ret);
 	}
+}
+
+LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)
+{
+	LPCSTR filepath = (LPCSTR)lParam;
+	// CMD, FALSE
+	int ret = SendCommandPacket(wParam >> 1, wParam & 1, (BYTE*)filepath, strlen(filepath));
+	return ret;
 }
 
