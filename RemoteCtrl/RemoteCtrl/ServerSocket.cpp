@@ -110,7 +110,7 @@ BOOL CServerSocket::InitSocket()
 	memset(&serv_addr, 0, sizeof(serv_addr));
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
-	serv_addr.sin_port = htons(10000);
+	serv_addr.sin_port = htons(20000);
 	if (bind(m_socket, (SOCKADDR*)&serv_addr, sizeof(serv_addr)) == SOCKET_ERROR)
 	{
 		MessageBox(NULL, _T("Cannot bind socket, please check network setting!"), _T("Socket Bind Error!"), MB_OK | MB_ICONERROR);
