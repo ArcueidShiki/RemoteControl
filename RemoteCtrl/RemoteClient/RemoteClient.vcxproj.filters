@@ -45,6 +45,9 @@
     <ClInclude Include="StatusDlg.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="WatchDlg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RemoteClient.cpp">
@@ -66,6 +69,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="StatusDlg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="WatchDlg.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
