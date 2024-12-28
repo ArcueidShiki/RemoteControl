@@ -7,6 +7,7 @@
 #include "RemoteClient.h"
 #include "RemoteClientDlg.h"
 #include "afxdialogex.h"
+#include "WatchDlg.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -54,6 +55,7 @@ CRemoteClientDlg::CRemoteClientDlg(CWnd* pParent /*=nullptr*/)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	pClient = CClientSocket::GetInstance();
+	m_isFull = FALSE;
 }
 
 void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
@@ -79,10 +81,21 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_COMMAND(ID_DELETE_FILE, &CRemoteClientDlg::OnDeleteFile)
 	ON_COMMAND(ID_OPEN_FILE, &CRemoteClientDlg::OnOpenFile)
 	ON_MESSAGE(WM_SEND_PACKET, &CRemoteClientDlg::OnSendPacket)
+	ON_BN_CLICKED(IDC_BTN_START_WATCH, &CRemoteClientDlg::OnBnClickedBtnStartWatch)
 END_MESSAGE_MAP()
 
 
 // CRemoteClientDlg message handlers
+
+BOOL CRemoteClientDlg::isFull() const
+{
+	return m_isFull;
+}
+
+CImage& CRemoteClientDlg::GetImage()
+{
+	return m_img;
+}
 
 BOOL CRemoteClientDlg::OnInitDialog()
 {
@@ -119,7 +132,6 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	UpdateData(FALSE);
 	m_dlgStatus.Create(IDD_DLG_STATUS, this);
 	m_dlgStatus.ShowWindow(SW_HIDE);
-	m_isFull = FALSE;
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -455,9 +467,27 @@ void CRemoteClientDlg::ThreadWatchData()
 			{
 				if (!m_isFull)
 				{
+					// update data ti cache
 					BYTE* pData = (BYTE*)pClient->GetPacket().strData.c_str();
-					// TODO save CImage to cache
-					m_isFull = TRUE;
+					HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
+					if (hMem == NULL)
+					{
+						TRACE("Insufficient Memory GlobalAlloc failed\n");
+						Sleep(1);
+						continue;
+					}
+					IStream* pStream = NULL;
+					HRESULT hRet = CreateStreamOnHGlobal(hMem, TRUE, &pStream);
+					if (hRet == S_OK)
+					{
+						ULONG written = 0;
+						ULONG len = (ULONG)pClient->GetPacket().strData.size();
+						pStream->Write(pData, len, &written);
+						LARGE_INTEGER li = { 0 };
+						pStream->Seek(li, STREAM_SEEK_SET, NULL);
+						m_img.Load(pStream);
+						m_isFull = TRUE;
+					}
 				}
 			}
 		}
@@ -555,4 +585,12 @@ LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)
 	// CMD, FALSE
 	int ret = SendCommandPacket(int(wParam >> 1), wParam & 1, (BYTE*)filepath, strlen(filepath));
 	return ret;
+}
+
+void CRemoteClientDlg::OnBnClickedBtnStartWatch()
+{
+	_beginthread(CRemoteClientDlg::ThreadEntryWatchData, 0, this);
+	//GetDlgItem(IDC_BTN_START_WATCH)->EnableWindow(FALSE);
+	CWatchDlg dlg(this);
+	dlg.DoModal();
 }
