@@ -1,7 +1,7 @@
 # Workflow
 
 1. git fetch origin main:main # it won't merge to the current branch. ":" used to specify merge branch
-2. git pull origin main:main # it will auto merge to the current branch.
+2. git pull origin main # it will auto merge to the current branch.
 3. git rebase main # resolve conflict to main. keep update ahead from main.
 4. git add .; git commit -s
 5. git push -f origin currentBranch
