@@ -4,7 +4,10 @@
 
 #pragma once
 #include "ClientSocket.h"
+#include "StatusDlg.h"
 
+// SEND PACKET MESSAGE
+#define WM_SEND_PACKET (WM_USER + 1)
 // CRemoteClientDlg dialog
 class CRemoteClientDlg : public CDialogEx
 {
@@ -24,7 +27,7 @@ public:
 // Implementation
 protected:
 	HICON m_hIcon;
-
+	CStatusDlg m_dlgStatus;
 	// Generated message map functions
 	virtual BOOL OnInitDialog();
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
@@ -42,6 +45,8 @@ private:
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
 	void LoadDirectory();
 	void LoadFiles();
+	static void ThreadEntryDownloadFile(void* arg);
+	void ThreadDownloadFile();
 	CClientSocket* pClient;
 public:
 	CTreeCtrl m_tree;
@@ -53,4 +58,5 @@ public:
 	afx_msg void OnDownloadFile();
 	afx_msg void OnDeleteFile();
 	afx_msg void OnOpenFile();
+	afx_msg LRESULT OnSendPacket(WPARAM wParam, LPARAM lParam);
 };
