@@ -1,6 +1,5 @@
 #pragma once
 #include "afxdialogex.h"
-#include "ClientSocket.h"
 
 // CWatchDlg dialog
 
@@ -29,6 +28,8 @@ public:
 	afx_msg void OnRButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnStnClickedWatch();
+	afx_msg void OnBnClickedBtnUnlock();
+	afx_msg void OnBnClickedBtnLock();
 	void OnOK();
 	CStatic m_picture;
 
@@ -37,7 +38,6 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 private:
-	CClientSocket* pClient;
 	int m_nRemoteWidth;
 	int m_nRemoteHeight;
 };

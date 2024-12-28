@@ -14,7 +14,6 @@ IMPLEMENT_DYNAMIC(CWatchDlg, CDialog)
 CWatchDlg::CWatchDlg(CWnd* pParent /*=nullptr*/)
 	: CDialog(IDD_DLG_WATCH, pParent)
 {
-	pClient = CClientSocket::GetInstance();
 	m_nRemoteWidth = -1;
 	m_nRemoteHeight = -1;
 }
@@ -39,6 +38,8 @@ BEGIN_MESSAGE_MAP(CWatchDlg, CDialog)
 	ON_WM_RBUTTONUP()
 	ON_WM_MOUSEMOVE()
 	ON_STN_CLICKED(IDC_WATCH, &CWatchDlg::OnStnClickedWatch)
+	ON_BN_CLICKED(IDC_BTN_UNLOCK, &CWatchDlg::OnBnClickedBtnUnlock)
+	ON_BN_CLICKED(IDC_BTN_LOCK, &CWatchDlg::OnBnClickedBtnLock)
 END_MESSAGE_MAP()
 
 // CWatchDlg message handlers
@@ -199,5 +200,16 @@ void CWatchDlg::OnStnClickedWatch()
 void CWatchDlg::OnOK()
 {
 	//CDialog::OnOK();
-	return;
+}
+
+
+void CWatchDlg::OnBnClickedBtnUnlock()
+{
+	(CRemoteClientDlg*)m_pParentWnd->SendMessage(WM_SEND_PACKET, CMD_UNLOCK_MACHINE << 1 | TRUE);
+}
+
+
+void CWatchDlg::OnBnClickedBtnLock()
+{
+	(CRemoteClientDlg*)m_pParentWnd->SendMessage(WM_SEND_PACKET, CMD_LOCK_MACHINE << 1 | TRUE);
 }
