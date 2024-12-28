@@ -372,6 +372,7 @@ void CRemoteClientDlg::ThreadEntryWatchData(void* arg)
 {
 	CRemoteClientDlg* pThis = (CRemoteClientDlg*)arg;
 	pThis->ThreadWatchData();
+	// Thread might not end.
 	_endthread();
 }
 
@@ -463,7 +464,7 @@ void CRemoteClientDlg::ThreadWatchData()
 	do {
 		pClient = CClientSocket::GetInstance();
 	} while (!pClient);
-	for (;;)
+	while (!m_isClosed)
 	{
 		if (m_isFull)
 		{
@@ -493,6 +494,7 @@ void CRemoteClientDlg::ThreadWatchData()
 					pStream->Write(pData, len, &written);
 					LARGE_INTEGER li = { 0 };
 					pStream->Seek(li, STREAM_SEEK_SET, NULL);
+					if ((HBITMAP)m_img != NULL) m_img.Destroy();
 					m_img.Load(pStream);
 					m_isFull = TRUE;
 				}
@@ -616,8 +618,11 @@ LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)
 
 void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 {
+	m_isClosed = FALSE;
 	CWatchDlg dlg(this);
-	_beginthread(CRemoteClientDlg::ThreadEntryWatchData, 0, this);
+	HANDLE hThread = (HANDLE)_beginthread(CRemoteClientDlg::ThreadEntryWatchData, 0, this);
 	//GetDlgItem(IDC_BTN_START_WATCH)->EnableWindow(FALSE);
 	dlg.DoModal();
+	m_isClosed = TRUE;
+	WaitForSingleObject(hThread, 500);
 }

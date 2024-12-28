@@ -15,6 +15,8 @@ CWatchDlg::CWatchDlg(CWnd* pParent /*=nullptr*/)
 	: CDialog(IDD_DLG_WATCH, pParent)
 {
 	pClient = CClientSocket::GetInstance();
+	m_nRemoteWidth = -1;
+	m_nRemoteHeight = -1;
 }
 
 CWatchDlg::~CWatchDlg()
@@ -48,8 +50,8 @@ CPoint CWatchDlg::UserPoint2RemoteScreen(CPoint& pt, BOOL isScreen/* = FALSE*/)
 	TRACE("%s x:%d, y:d\n", __FUNCTION__, pt.x, pt.y);
 	m_picture.GetWindowRect(&clientRect);
 	// local coordinate to remote screen coordinate
-	int x = pt.x * 1920 / clientRect.Width();
-	int y = pt.y * 1080 / clientRect.Height();
+	int x = pt.x * m_nRemoteWidth / clientRect.Width();
+	int y = pt.y * m_nRemoteHeight / clientRect.Height();
 	TRACE("%s 2 x:%d, y:d\n", __FUNCTION__,x, y);
 	return CPoint(x, y);
 }
@@ -73,6 +75,14 @@ void CWatchDlg::OnTimer(UINT_PTR nIDEvent)
 		{
 			CRect rect;
 			m_picture.GetWindowRect(&rect);
+			if (m_nRemoteWidth == -1)
+			{
+				m_nRemoteWidth = pParent->GetImage().GetWidth();
+			}
+			if (m_nRemoteHeight == -1)
+			{
+				m_nRemoteHeight = pParent->GetImage().GetHeight();
+			}
 			//pParent->GetImage().BitBlt(m_picture.GetDC()->GetSafeHdc(), 0, 0, SRCCOPY);
 			pParent->GetImage().StretchBlt(m_picture.GetDC()->GetSafeHdc(), 0, 0, rect.Width(), rect.Height(), SRCCOPY);
 			m_picture.InvalidateRect(NULL);
@@ -88,6 +98,10 @@ void CWatchDlg::OnTimer(UINT_PTR nIDEvent)
 
 void CWatchDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 {
+	if (m_nRemoteHeight == -1 && m_nRemoteWidth == -1)
+	{
+		return;
+	}
 	CPoint remote = UserPoint2RemoteScreen(point);
 	// POINT is tagPOINT: the parent of CPoint
 	MOUSEEV event(MOUSE_LEFT, MOUSE_DBCLICK, remote);
@@ -97,6 +111,10 @@ void CWatchDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 
 void CWatchDlg::OnLButtonDown(UINT nFlags, CPoint point)
 {
+	if (m_nRemoteHeight == -1 && m_nRemoteWidth == -1)
+	{
+		return;
+	}
 	TRACE("x:%d, y:d\n", point.x, point.y);
 	CPoint remote = UserPoint2RemoteScreen(point);
 	TRACE("remote: x:%d, y:d\n", remote.x, remote.y);
@@ -107,6 +125,10 @@ void CWatchDlg::OnLButtonDown(UINT nFlags, CPoint point)
 
 void CWatchDlg::OnLButtonUp(UINT nFlags, CPoint point)
 {
+	if (m_nRemoteHeight == -1 && m_nRemoteWidth == -1)
+	{
+		return;
+	}
 	CPoint remote = UserPoint2RemoteScreen(point);
 	MOUSEEV event(MOUSE_LEFT, MOUSE_UP, remote);
 	(CRemoteClientDlg*)m_pParentWnd->SendMessage(WM_SEND_PACKET, CMD_MOUSE << 1 | TRUE, (WPARAM)&event);
@@ -115,6 +137,10 @@ void CWatchDlg::OnLButtonUp(UINT nFlags, CPoint point)
 
 void CWatchDlg::OnRButtonDblClk(UINT nFlags, CPoint point)
 {
+	if (m_nRemoteHeight == -1 && m_nRemoteWidth == -1)
+	{
+		return;
+	}
 	CPoint remote = UserPoint2RemoteScreen(point);
 	MOUSEEV event(MOUSE_RIGHT, MOUSE_DBCLICK, remote);
 	(CRemoteClientDlg*)m_pParentWnd->SendMessage(WM_SEND_PACKET, CMD_MOUSE << 1 | TRUE, (WPARAM)&event);
@@ -123,6 +149,10 @@ void CWatchDlg::OnRButtonDblClk(UINT nFlags, CPoint point)
 
 void CWatchDlg::OnRButtonDown(UINT nFlags, CPoint point)
 {
+	if (m_nRemoteHeight == -1 && m_nRemoteWidth == -1)
+	{
+		return;
+	}
 	CPoint remote = UserPoint2RemoteScreen(point);
 	MOUSEEV event(MOUSE_RIGHT, MOUSE_DOWN, remote);
 	(CRemoteClientDlg*)m_pParentWnd->SendMessage(WM_SEND_PACKET, CMD_MOUSE << 1 | TRUE, (WPARAM)&event);
@@ -131,6 +161,10 @@ void CWatchDlg::OnRButtonDown(UINT nFlags, CPoint point)
 
 void CWatchDlg::OnRButtonUp(UINT nFlags, CPoint point)
 {
+	if (m_nRemoteHeight == -1 && m_nRemoteWidth == -1)
+	{
+		return;
+	}
 	CPoint remote = UserPoint2RemoteScreen(point);
 	MOUSEEV event(MOUSE_RIGHT, MOUSE_UP, remote);
 	(CRemoteClientDlg*)m_pParentWnd->SendMessage(WM_SEND_PACKET, CMD_MOUSE << 1 | TRUE, (WPARAM)&event);
@@ -139,6 +173,10 @@ void CWatchDlg::OnRButtonUp(UINT nFlags, CPoint point)
 
 void CWatchDlg::OnMouseMove(UINT nFlags, CPoint point)
 {
+	if (m_nRemoteHeight == -1 && m_nRemoteWidth == -1)
+	{
+		return;
+	}
 	CPoint remote = UserPoint2RemoteScreen(point);
 	MOUSEEV event(MOUSE_MOVE, MOUSE_MOVE, remote);
 	(CRemoteClientDlg*)m_pParentWnd->SendMessage(WM_SEND_PACKET, CMD_MOUSE << 1 | TRUE, (WPARAM)&event);
@@ -147,9 +185,19 @@ void CWatchDlg::OnMouseMove(UINT nFlags, CPoint point)
 
 void CWatchDlg::OnStnClickedWatch()
 {
+	if (m_nRemoteHeight == -1 && m_nRemoteWidth == -1)
+	{
+		return;
+	}
 	CPoint pt;
 	GetCursorPos(&pt);
 	CPoint remote = UserPoint2RemoteScreen(pt, TRUE);
 	MOUSEEV event(MOUSE_LEFT, MOUSE_DOWN, remote);
 	(CRemoteClientDlg*)m_pParentWnd->SendMessage(WM_SEND_PACKET, CMD_MOUSE << 1 | TRUE, (WPARAM)&event);
+}
+
+void CWatchDlg::OnOK()
+{
+	//CDialog::OnOK();
+	return;
 }
