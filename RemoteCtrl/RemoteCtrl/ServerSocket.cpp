@@ -230,30 +230,6 @@ BOOL CServerSocket::Send(CPacket& packet)
 	return send(m_client, packet.Data(), (int)packet.Size(), 0) != SOCKET_ERROR;
 }
 
-BOOL CServerSocket::GetFilePath(std::string& strPath)
-{
-	if (m_packet.sCmd == CMD_DIR || m_packet.sCmd == CMD_RUN_FILE
-		|| m_packet.sCmd == CMD_DLD_FILE || m_packet.sCmd == CMD_DEL_FILE)
-	{
-		strPath = m_packet.strData;
-		return TRUE;
-	}
-	return FALSE;
-}
-
-/**
-* Mouse event: move, right click, left click, double click
-*/
-BOOL CServerSocket::GetMouseEvent(MOUSEEV& mouse)
-{
-	if (m_packet.sCmd == CMD_MOUSE)
-	{
-		memcpy(&mouse, m_packet.strData.c_str(), sizeof(MOUSEEV));
-		return TRUE;
-	}
-	return FALSE;
-}
-
 void CServerSocket::CloseClient()
 {
 	if (m_client != INVALID_SOCKET) {

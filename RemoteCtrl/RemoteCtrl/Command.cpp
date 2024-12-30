@@ -29,10 +29,6 @@ CCommand::~CCommand()
 {
 }
 
-void CCommand::Init()
-{
-}
-
 /**
 * Lookup files, need driver partitions
 */
