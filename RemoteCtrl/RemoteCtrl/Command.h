@@ -28,23 +28,23 @@ public:
 	CCommand();
 	~CCommand();
 	void Init();
-	int ExecuteCommand(int nCmd);
-	int MakeDriverInfo();
-	int MakeDirectoryInfo();
-	int RunFile();
-	int DownloadFile();
-	int DelFile();
-	int MouseEvent();
-	int SendScreen();
-	int LockMachine();
-	int UnlockMachine();
-	static unsigned __stdcall ThreadLockDlg(void *arg);
+	int ExecuteCommand(int nCmd, std::list<CPacket>& lstPackets, CPacket &inPacket);
+	int MakeDriverInfo(std::list<CPacket>& lstPackets, CPacket& inPacket);
+	int MakeDirectoryInfo(std::list<CPacket>& lstPackets, CPacket& inPacket);
+	int RunFile(std::list<CPacket>& lstPackets, CPacket& inPacket);
+	int DownloadFile(std::list<CPacket>& lstPackets, CPacket& inPacket);
+	int DelFile(std::list<CPacket>& lstPackets, CPacket& inPacket);
+	int MouseEvent(std::list<CPacket>& lstPackets, CPacket& inPacket);
+	int SendScreen(std::list<CPacket>& lstPackets, CPacket& inPacket);
+	int LockMachine(std::list<CPacket>& lstPackets, CPacket& inPacket);
+	int UnlockMachine(std::list<CPacket>& lstPackets, CPacket& inPacket);
 	void ThreadLockDlgMain();
+	static unsigned __stdcall ThreadLockDlg(void *obj);
+	static void RunCommand(void *obj, int nCmd, std::list<CPacket>& lstPackets, CPacket& inPacket);
 protected:
-	typedef int (CCommand::* CMDFUNC)(); // member function pointer
+	typedef int (CCommand::* CMDFUNC)(std::list<CPacket>&, CPacket& inPacket); // member function pointer
 	std::map<int, CMDFUNC> m_mapCmd;
 	CLockDialog dlg;
 	unsigned tid;
-	CServerSocket* pServer;
 };
 

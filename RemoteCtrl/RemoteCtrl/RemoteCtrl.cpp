@@ -45,43 +45,20 @@ int main()
         }
         else
         {
-#if 1
             CCommand cmd;
             // global variable, only one instance
             pServer = CServerSocket::GetInstance();
-            int count = 0;
-            while (pServer)
+            int ret = pServer->Run(&CCommand::RunCommand, &cmd);
+            switch (ret)
             {
-                if (!pServer->AcceptClient())
-                {
-                    if (count > 3)
-                    {
-						MessageBox(NULL, _T("Cannot accept user, failed many time, program exit"), _T("Accept Client Failed!"), MB_OK | MB_ICONERROR);
-						break;
-                    }
-                    MessageBox(NULL, _T("Cannot accept user, auto retry"), _T("Accept Client Failed!"), MB_OK | MB_ICONERROR);
-                    count++;
-                }
-                //TRACE("New Client connection\n");
-				int rCmd = pServer->DealCommand();
-				if (rCmd == -1)
-				{
-					TRACE("Parse Command failed\n");
-					break;
-				}
-                //TRACE("Parse Command : %d\n", cmd);
-                int ret = cmd.ExecuteCommand(rCmd);
-                if (ret == -1)
-                {
-					TRACE("Execute Command failed: cmd = %d, ret = %d\n", rCmd, ret);
-                }
-				//TRACE("Execute Command : %d, Success\n", cmd);
-                //CPacket reply(ret, NULL, 0);
-				//pServer->Send(reply); Really Need?
-                // short connection. FTP usually use long connection
-                pServer->CloseClient();
+            case -1:
+                MessageBox(NULL, _T("Cannot Initiate socket, please check network setting!"), _T("Soccket Initialization Error!"), MB_OK | MB_ICONERROR);
+                exit(0);
+                break;
+			case -2:
+                MessageBox(NULL, _T("Cannot accept user, failed many time, program exit"), _T("Accept Client Failed!"), MB_OK | MB_ICONERROR);
+                break;
             }
-#endif
         }
     }
     else

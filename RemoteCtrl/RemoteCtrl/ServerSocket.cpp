@@ -17,18 +17,21 @@ CServerSocket::CServerSocket()
 		MessageBox(NULL, _T("Cannot Initiate socket environment, please check network setting!"), _T("Soccket Initialization Error!"), MB_OK | MB_ICONERROR);
 		exit(0);
 	}
+#if 0
 	if (!InitSocket())
 	{
 		MessageBox(NULL, _T("Cannot Initiate socket, please check network setting!"), _T("Soccket Initialization Error!"), MB_OK | MB_ICONERROR);
 		exit(0);
 	}
-	//MessageBox(NULL, _T("初始化套接字成功"), _T("1111111111"), MB_OK | MB_ICONERROR);
+#endif
 }
 
 CServerSocket::CServerSocket(const CServerSocket& other)
 {
 	m_socket = other.m_socket;
 	m_client = other.m_client;
+	m_arg = other.m_arg;
+	m_callback = other.m_callback;
 }
 
 CServerSocket& CServerSocket::operator=(const CServerSocket& other)
@@ -37,6 +40,8 @@ CServerSocket& CServerSocket::operator=(const CServerSocket& other)
 	{
 		m_socket = other.m_socket;
 		m_client = other.m_client;
+		m_arg = other.m_arg;
+		m_callback = other.m_callback;
 	}
 	return *this;
 }
@@ -94,7 +99,7 @@ BOOL CServerSocket::InitSocketEnv()
 	return TRUE;
 }
 
-BOOL CServerSocket::InitSocket()
+BOOL CServerSocket::InitSocket(USHORT port /* = 20000 */)
 {
 	if (m_socket != INVALID_SOCKET)
 	{
@@ -110,7 +115,7 @@ BOOL CServerSocket::InitSocket()
 	memset(&serv_addr, 0, sizeof(serv_addr));
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
-	serv_addr.sin_port = htons(20000);
+	serv_addr.sin_port = htons(port);
 	if (bind(m_socket, (SOCKADDR*)&serv_addr, sizeof(serv_addr)) == SOCKET_ERROR)
 	{
 		MessageBox(NULL, _T("Cannot bind socket, please check network setting!"), _T("Socket Bind Error!"), MB_OK | MB_ICONERROR);
@@ -183,6 +188,36 @@ int CServerSocket::DealCommand()
 	return -1;
 }
 
+int CServerSocket::Run(SOCKET_CALLBACK callback, void* arg, USHORT port)
+{
+	if (!InitSocket(port)) return -1;
+	m_callback = callback;
+	m_arg = arg;
+	int count = 0;
+	std::list<CPacket> lstPackets;
+	while (TRUE)
+	{
+		if (!AcceptClient())
+		{
+			if (count > 3) return -2;
+			count++;
+			MessageBox(NULL, _T("Cannot accept user, auto retry"), _T("Accept Client Failed!"), MB_OK | MB_ICONERROR);
+		}
+		int cmd = DealCommand();
+		if (cmd > 0)
+		{
+			m_callback(m_arg, cmd, lstPackets, m_packet);
+			if (lstPackets.size() > 0)
+			{
+				Send(lstPackets.front());
+				lstPackets.pop_front();
+			}
+		}
+		CloseClient();
+	}
+	return 0;
+}
+
 BOOL CServerSocket::Send(const char* pData, size_t nSize)
 {
 	if (m_client == INVALID_SOCKET) return FALSE;
@@ -221,6 +256,8 @@ BOOL CServerSocket::GetMouseEvent(MOUSEEV& mouse)
 
 void CServerSocket::CloseClient()
 {
-	closesocket(m_client);
-	m_client = INVALID_SOCKET;
+	if (m_client != INVALID_SOCKET) {
+		closesocket(m_client);
+		m_client = INVALID_SOCKET;
+	}
 }
