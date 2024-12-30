@@ -13,14 +13,13 @@ class CServerSocket
 public:
 	// static function no this pointer, belongs to class. can access non static member.
 	static CServerSocket* GetInstance();
+	int Run(SOCKET_CALLBACK callback, void* arg, USHORT port = DEFAULT_PROT);
+protected:
 	BOOL InitSocket(USHORT port = DEFAULT_PROT);
 	BOOL AcceptClient();
 	BOOL Send(const char* pData, size_t nSize);
-	BOOL Send(CPacket &packet);
-	BOOL GetFilePath(std::string& strPath);
-	BOOL GetMouseEvent(MOUSEEV &mouse);
+	BOOL Send(CPacket& packet);
 	int DealCommand();
-	int Run(SOCKET_CALLBACK callback, void* arg, USHORT port = DEFAULT_PROT);
 	void CloseClient();
 private:
 	// Initialize before main

@@ -27,8 +27,9 @@ class CCommand
 public:
 	CCommand();
 	~CCommand();
-	void Init();
 	int ExecuteCommand(int nCmd, std::list<CPacket>& lstPackets, CPacket &inPacket);
+	static void RunCommand(void *obj, int nCmd, std::list<CPacket>& lstPackets, CPacket& inPacket);
+protected:
 	int MakeDriverInfo(std::list<CPacket>& lstPackets, CPacket& inPacket);
 	int MakeDirectoryInfo(std::list<CPacket>& lstPackets, CPacket& inPacket);
 	int RunFile(std::list<CPacket>& lstPackets, CPacket& inPacket);
@@ -39,9 +40,7 @@ public:
 	int LockMachine(std::list<CPacket>& lstPackets, CPacket& inPacket);
 	int UnlockMachine(std::list<CPacket>& lstPackets, CPacket& inPacket);
 	void ThreadLockDlgMain();
-	static unsigned __stdcall ThreadLockDlg(void *obj);
-	static void RunCommand(void *obj, int nCmd, std::list<CPacket>& lstPackets, CPacket& inPacket);
-protected:
+	static unsigned __stdcall ThreadLockDlg(void* obj);
 	typedef int (CCommand::* CMDFUNC)(std::list<CPacket>&, CPacket& inPacket); // member function pointer
 	std::map<int, CMDFUNC> m_mapCmd;
 	CLockDialog dlg;
