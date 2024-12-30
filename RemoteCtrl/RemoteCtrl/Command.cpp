@@ -23,7 +23,6 @@ CCommand::CCommand()
 		m_mapCmd.insert(std::pair<int, CMDFUNC>(data[i].nCmd, data[i].func));
 	}
     tid = 0;
-	pServer = CServerSocket::GetInstance();
 }
 
 CCommand::~CCommand()
@@ -37,7 +36,7 @@ void CCommand::Init()
 /**
 * Lookup files, need driver partitions
 */
-int CCommand::MakeDriverInfo()
+int CCommand::MakeDriverInfo(std::list<CPacket>& lstPackets, CPacket& inPacket)
 {
     std::string result;
     // 1 == A, 2 == B, 3 == C, 26 == Z
@@ -52,35 +51,29 @@ int CCommand::MakeDriverInfo()
     }
 
     // sCmd, data "C,D,E"
-    CPacket packet(CMD_DRIVER, (BYTE*)result.c_str(), result.size());
+    // CPacket packet(CMD_DRIVER, (BYTE*)result.c_str(), result.size());
     // FF FE(head) 09 00 00 00(length = datasize + cmd+sum) 01 00(cnd) 43 2C 44 2C 45(C(43),D(44),E(45)) 24 01(01 24 = 43 + 2C + 44 + 2C + 45)
-    CUtils::Dump((BYTE*)packet.Data(), packet.Size());
-
-    pServer->Send(packet);
+    // CUtils::Dump((BYTE*)packet.Data(), packet.Size());
+    lstPackets.emplace_back(std::move(CPacket(CMD_DRIVER, (BYTE*)result.c_str(), result.size())));
     return 0;
 }
 
 /**
 * Lookup directories
 */
-int CCommand::MakeDirectoryInfo()
+int CCommand::MakeDirectoryInfo(std::list<CPacket>& lstPackets, CPacket& inPacket)
 {
-    std::string strPath;
-    if (!pServer->GetFilePath(strPath))
-    {
-        OutputDebugString(_T("GetFilePath failed, Current cmd is not get file list, parse failed!!!\n"));
-        return -1;
-    }
+    std::string strPath = inPacket.strData;
     if (_chdir(strPath.c_str()) != 0)
     {
-        FILEINFO finfo;
-        finfo.IsDirectory = TRUE;
-        finfo.IsValid = FALSE;
-        finfo.HasNext = FALSE;
+        FILEINFO finfo(FALSE, FALSE, FALSE, strPath.c_str());
+        // finfo.IsDirectory = TRUE;
+        // finfo.IsValid = FALSE;
+        // finfo.HasNext = FALSE;
+        // size() not include trailing '\0'
         memcpy(finfo.szFileName, strPath.c_str(), strPath.size());
         OutputDebugString(_T("No permission to access the directory\n"));
-        CPacket packet(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
-        pServer->Send(packet);
+        lstPackets.emplace_back(std::move(CPacket(CMD_DIR, (BYTE*)&finfo, sizeof(finfo))));
         return -2;
     }
     _finddata_t fdata;
@@ -88,7 +81,9 @@ int CCommand::MakeDirectoryInfo()
     intptr_t hfind = 0;
     if ((hfind = _findfirst("*", &fdata)) == -1)
     {
+        FILEINFO finfo(FALSE, TRUE, FALSE, strPath.c_str());
         OutputDebugString(_T("No files in the directory\n"));
+        lstPackets.emplace_back(std::move(CPacket(CMD_DIR, (BYTE*)&finfo, sizeof(finfo))));
         return -3;
     }
     int ret;
@@ -97,40 +92,32 @@ int CCommand::MakeDirectoryInfo()
         FILEINFO finfo;
         finfo.IsDirectory = fdata.attrib & _A_SUBDIR;
         memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
-        CPacket packet(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
-        pServer->Send(packet); // NONBLOCK
+        lstPackets.emplace_back(std::move(CPacket(CMD_DIR, (BYTE*)&finfo, sizeof(finfo))));
         TRACE("Server Send filename id : [%d], name: [%s], HasNext: [%d]\r\n", ++id, fdata.name, finfo.HasNext);
-        // it will blow up the buffer of client
-        // using ack or sleep
-        //Sleep(10);
         ret = _findnext(hfind, &fdata);
     } while (ret == 0);
     // when tmpfiles or logfiles, are huge, so send one file every time read.
     FILEINFO finfo;
     // tell client, end.
     finfo.HasNext = FALSE;
-    CPacket packet(CMD_DIR, (BYTE*)&finfo, sizeof(finfo));
-    pServer->Send(packet);
+    lstPackets.emplace_back(std::move(CPacket(CMD_DIR, (BYTE*)&finfo, sizeof(finfo))));
     _findclose(hfind);
     return 0;
 }
 
-int CCommand::RunFile()
+int CCommand::RunFile(std::list<CPacket>& lstPackets, CPacket& inPacket)
 {
-    std::string strPath;
-    pServer->GetFilePath(strPath);
+    std::string strPath = inPacket.strData;
     // open / run file.
     ShellExecuteA(NULL, NULL, strPath.c_str(), NULL, NULL, SW_SHOWNORMAL);
-    CPacket packet(CMD_RUN_FILE, NULL, 0);
-    pServer->Send(packet);
+	lstPackets.emplace_back(std::move(CPacket(CMD_RUN_FILE, NULL, 0)));
     return 0;
 }
 
-int CCommand::DownloadFile()
+int CCommand::DownloadFile(std::list<CPacket>& lstPackets, CPacket& inPacket)
 {
 #define DLD_BUF_SIZE 1024 // local scope macro, is not accessible globally.
-    std::string strPath;
-    pServer->GetFilePath(strPath);
+    std::string strPath = inPacket.strData;
     FILE* pFile = NULL;
     long long size = 0;
     // if you open first, then, other process open this in exclusive mode, you have the pointer, but cannot do anything.
@@ -139,8 +126,7 @@ int CCommand::DownloadFile()
     errno_t err = fopen_s(&pFile, strPath.c_str(), "rb");
     if (err != 0)
     {
-        CPacket packet(CMD_DLD_FILE, (BYTE*)&size, sizeof(size));
-        pServer->Send(packet);
+        lstPackets.emplace_back(std::move(CPacket(CMD_DLD_FILE, (BYTE*)&size, sizeof(size))));
         TRACE("Open File failed filename:[%s], name len: %zu\n", strPath.c_str(), strPath.size());
         return -1;
     }
@@ -150,25 +136,22 @@ int CCommand::DownloadFile()
         fseek(pFile, 0, SEEK_END);
         size = _ftelli64(pFile);
         TRACE("Server Filename:[%s], size:[%lld]\n", strPath.c_str(), size);
-        CPacket head(CMD_DLD_FILE, (BYTE*)&size, sizeof(size));
-        pServer->Send(head);
+        lstPackets.emplace_back(std::move(CPacket(CMD_DLD_FILE, (BYTE*)&size, sizeof(size))));
         fseek(pFile, 0, SEEK_SET);
         char buf[DLD_BUF_SIZE] = "";
         size_t rlen = 0;
         do {
             rlen = fread(buf, 1, DLD_BUF_SIZE, pFile);
-            CPacket packet(CMD_DLD_FILE, (BYTE*)buf, rlen);
-            pServer->Send(packet);
+            lstPackets.emplace_back(std::move(CPacket(CMD_DLD_FILE, (BYTE*)buf, rlen)));
         } while (rlen >= DLD_BUF_SIZE);
         fclose(pFile);
     }
     return 0;
 }
 
-int CCommand::DelFile()
+int CCommand::DelFile(std::list<CPacket>& lstPackets, CPacket& inPacket)
 {
-    std::string strPath;
-    pServer->GetFilePath(strPath);
+    std::string strPath = inPacket.strData;
     TRACE("strPath: [%s]\n", strPath.c_str());
     WCHAR sPath[MAX_PATH] = _T("");
     size_t nConverted;
@@ -193,24 +176,20 @@ int CCommand::DelFile()
         TRACE("DeleteFileW failed, error code: %d\n", GetLastError());
     }
     DeleteFileA(strPath.c_str());
-    CPacket packet(CMD_DEL_FILE, NULL, 0);
-    BOOL ret = pServer->Send(packet);
-    TRACE("Send ret = %d\n", ret);
+	lstPackets.emplace_back(std::move(CPacket(CMD_DEL_FILE, NULL, 0)));
     return 0;
 }
 
-int CCommand::MouseEvent()
+int CCommand::MouseEvent(std::list<CPacket>& lstPackets, CPacket& inPacket)
 {
     MOUSEEV mouse;
-    if (pServer->GetMouseEvent(mouse))
+	memcpy(&mouse, inPacket.strData.c_str(), sizeof(MOUSEEV));
+    DWORD operation = mouse.nButton;
+    if (operation != MOUSE_MOVE) SetCursorPos(mouse.point.x, mouse.point.y);
+    operation |= mouse.nAction;
+    TRACE("Mouse operation: %08X, x: %d, y: %d\n", operation, mouse.point.x, mouse.point.y);
+    switch (operation)
     {
-        DWORD operation = mouse.nButton;
-        if (operation != MOUSE_MOVE)
-            SetCursorPos(mouse.point.x, mouse.point.y);
-        operation |= mouse.nAction;
-        TRACE("Mouse operation: %08X, x: %d, y: %d\n", operation, mouse.point.x, mouse.point.y);
-        switch (operation)
-        {
         case MOUSE_LEFT | MOUSE_CLICK:
             mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());
             mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, GetMessageExtraInfo());
@@ -261,19 +240,12 @@ int CCommand::MouseEvent()
             break;
         case MOUSE_MOVE:
             mouse_event(MOUSEEVENTF_MOVE, mouse.point.x, mouse.point.y, 0, GetMessageExtraInfo());
-        }
-        CPacket packet(CMD_MOUSE, NULL, 0);
-        pServer->Send(packet);
     }
-    else
-    {
-        OutputDebugString(_T("GetMouseEvent failed, Current cmd is not mouse event, parse failed!!!\n"));
-        return -1;
-    }
+	lstPackets.emplace_back(std::move(CPacket(CMD_MOUSE, NULL, 0)));
     return 0;
 }
 
-int CCommand::SendScreen()
+int CCommand::SendScreen(std::list<CPacket>& lstPackets, CPacket& inPacket)
 {
     CImage screen; // GDI: Global Device Interface
     HDC hScreen = ::GetDC(NULL); // device context
@@ -305,8 +277,7 @@ int CCommand::SendScreen()
     pStream->Seek(li, STREAM_SEEK_SET, NULL);
     PBYTE pData = (PBYTE)GlobalLock(hMem);
     SIZE_T nSize = GlobalSize(hMem);
-    CPacket packet(CMD_SEND_SCREEN, pData, nSize);
-    pServer->Send(packet);
+	lstPackets.emplace_back(std::move(CPacket(CMD_SEND_SCREEN, pData, nSize)));
     GlobalUnlock(hMem);
     pStream->Release();
     GlobalFree(hMem);
@@ -314,12 +285,29 @@ int CCommand::SendScreen()
     return 0;
 }
 
-unsigned __stdcall CCommand::ThreadLockDlg(void* arg)
+unsigned __stdcall CCommand::ThreadLockDlg(void* obj)
 {
-	CCommand* self = (CCommand*)arg;
+	CCommand* self = (CCommand*)obj;
     self->ThreadLockDlgMain();
     _endthreadex(0);
     return 0;
+}
+
+void CCommand::RunCommand(void* obj, int nCmd, std::list<CPacket> &lstPackets, CPacket& inPacket)
+{
+    CCommand* self = (CCommand*)obj;
+    if (nCmd > 0)
+    {
+        int ret = self->ExecuteCommand(nCmd, lstPackets, inPacket);
+        if (ret != 0)
+        {
+            TRACE("Execute Command failed: cmd = %d, ret = %d\n", nCmd, ret);
+        }
+    }
+    else
+    {
+        TRACE("Parse Command failed\n");
+    }
 }
 
 void CCommand::ThreadLockDlgMain()
@@ -348,7 +336,7 @@ void CCommand::ThreadLockDlgMain()
         int y = (rect.bottom - rtText.Height()) / 2;
         pText->MoveWindow(x, y, rtText.Width(), rtText.Height());
     }
-    //dlg.GetWindowRect(&rect);
+    // dlg.GetWindowRect(&rect);
     ClipCursor(&rect); // restrict mouse move range.
     MSG msg;
     // bind to current thread, only can get message from this thread
@@ -371,7 +359,7 @@ void CCommand::ThreadLockDlgMain()
     ShowCursor(TRUE);
 }
 
-int CCommand::LockMachine()
+int CCommand::LockMachine(std::list<CPacket>& lstPackets, CPacket& inPacket)
 {
     if (dlg.m_hWnd == NULL || dlg.m_hWnd == INVALID_HANDLE_VALUE)
     {
@@ -380,27 +368,26 @@ int CCommand::LockMachine()
         _beginthreadex(NULL, 0, &CCommand::ThreadLockDlg, this, 0, &tid);
         TRACE("Thread id = %u\n", tid);
     }
-    CPacket packet(CMD_UNLOCK_MACHINE, NULL, 0);
-    pServer->Send(packet);
+	lstPackets.emplace_back(std::move(CPacket(CMD_LOCK_MACHINE, NULL, 0)));
     return 0;
 }
 
-int CCommand::UnlockMachine()
+int CCommand::UnlockMachine(std::list<CPacket>& lstPackets, CPacket& inPacket)
 {
     // simulate press ESC
     PostThreadMessage(tid, WM_KEYDOWN, VK_ESCAPE, 0x00010001);
     // send back to client
-    CPacket packet(CMD_UNLOCK_MACHINE, NULL, 0);
-    pServer->Send(packet);
+    lstPackets.emplace_back(std::move(CPacket(CMD_UNLOCK_MACHINE, NULL, 0)));
     return 0;
 }
 
-int CCommand::ExecuteCommand(int nCmd)
+int CCommand::ExecuteCommand(int nCmd, std::list<CPacket>& lstPackets, CPacket& inPacket)
 {
 	std::map<int, CMDFUNC>::iterator it = m_mapCmd.find(nCmd);
 	if (it == m_mapCmd.end())
 	{
 		return -1;
 	}
-	return (this->*(it->second))();
+    // it->second is CMDFUNC type point to one member function.
+	return (this->*(it->second))(lstPackets, inPacket);
 }

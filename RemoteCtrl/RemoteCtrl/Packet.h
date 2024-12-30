@@ -37,3 +37,24 @@ public:
 };
 #pragma pack(pop)
 
+typedef struct file_info {
+	file_info()
+	{
+		IsValid = TRUE;
+		IsDirectory = FALSE;
+		HasNext = TRUE;
+		memset(szFileName, 0, sizeof(szFileName));
+	}
+	file_info(BOOL valid, BOOL dir, BOOL next, const char* name = "")
+	{
+		IsValid = valid;
+		IsDirectory = dir;
+		HasNext = next;
+		memset(szFileName, 0, sizeof(szFileName));
+		memcpy(szFileName, name, strlen(name));
+	}
+	BOOL IsValid;
+	BOOL IsDirectory;
+	BOOL HasNext;
+	char szFileName[256];
+} FILEINFO, * PFILEINFO;
