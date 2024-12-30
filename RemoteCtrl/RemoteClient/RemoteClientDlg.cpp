@@ -189,8 +189,6 @@ HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
-
-
 void CRemoteClientDlg::OnBnClickedBtnTest()
 {
 	SendCommandPacket(CMD_DRIVER);
