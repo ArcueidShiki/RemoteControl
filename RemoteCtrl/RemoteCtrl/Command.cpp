@@ -62,11 +62,8 @@ int CCommand::MakeDirectoryInfo(std::list<CPacket>& lstPackets, CPacket& inPacke
     std::string strPath = inPacket.strData;
     if (_chdir(strPath.c_str()) != 0)
     {
-        FILEINFO finfo(FALSE, FALSE, FALSE, strPath.c_str());
-        // finfo.IsDirectory = TRUE;
-        // finfo.IsValid = FALSE;
-        // finfo.HasNext = FALSE;
         // size() not include trailing '\0'
+		FILEINFO finfo(FALSE, TRUE, FALSE, strPath.c_str());
         memcpy(finfo.szFileName, strPath.c_str(), strPath.size());
         OutputDebugString(_T("No permission to access the directory\n"));
         lstPackets.emplace_back(std::move(CPacket(CMD_DIR, (BYTE*)&finfo, sizeof(finfo))));

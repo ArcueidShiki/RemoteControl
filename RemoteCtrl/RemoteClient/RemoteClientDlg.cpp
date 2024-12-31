@@ -133,7 +133,7 @@ BOOL CRemoteClientDlg::OnInitDialog()
 
 	UpdateData();
 	m_port = _T("10000");
-	m_server_address = 0x7F000001; // 127.0.0.1
+	m_server_address = 0x0A00020F; // 127.0.0.1
 	UpdateData(FALSE);
 	m_dlgStatus.Create(IDD_DLG_STATUS, this);
 	m_dlgStatus.ShowWindow(SW_HIDE);
