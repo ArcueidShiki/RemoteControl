@@ -207,7 +207,11 @@ int CServerSocket::Run(SOCKET_CALLBACK callback, void* arg, USHORT port)
 		if (cmd > 0)
 		{
 			m_callback(m_arg, cmd, lstPackets, m_packet);
-			if (lstPackets.size() > 0)
+			if (lstPackets.size() == 0)
+			{
+				TRACE("Error Server send packet size  = 0\n");
+			}
+			while (lstPackets.size() > 0)
 			{
 				Send(lstPackets.front());
 				lstPackets.pop_front();
