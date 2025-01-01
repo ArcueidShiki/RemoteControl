@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "ClientController.h"
+#include "Utils.h"
 
 std::map<UINT, CClientController::MSGFUNC> CClientController::m_mapFunc;
 CClientController* CClientController::m_instance = NULL;
@@ -24,14 +25,14 @@ int CClientController::InitController()
 int CClientController::Invoke(CWnd** pMainWnd)
 {
 	*pMainWnd = &m_clientDlg;
-	return m_clientDlg.DoModal();
+	return (int)m_clientDlg.DoModal();
 }
 
 /**
 * @msg: UINT nMsg Code: for cmd code
 * @wParam: WPARAM autoclose?
 */
-LRESULT CClientController::SendMessage(MSG msg, WPARAM wParam, LPARAM lParam)
+LRESULT CClientController::SendMsg(MSG msg)
 {
 	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 	if (!hEvent) return -2;
@@ -41,6 +42,58 @@ LRESULT CClientController::SendMessage(MSG msg, WPARAM wParam, LPARAM lParam)
 	PostThreadMessage(m_tid, WM_SEND_MESSAGE, (WPARAM)&info, (LPARAM)hEvent);
 	WaitForSingleObject(hEvent, INFINITE);
 	return info.result;
+}
+
+void CClientController::UpdateAddress(ULONG nIp, USHORT nPort)
+{
+}
+
+int CClientController::DealCommand()
+{
+	return CClientSocket::GetInstance()->DealCommand();
+}
+
+void CClientController::CloseSocket()
+{
+	CClientSocket::GetInstance()->CloseSocket();
+}
+
+BOOL CClientController::SendPacket(const CPacket& packet)
+{
+	CClientSocket* pClient = CClientSocket::GetInstance();
+	if (!pClient) return FALSE;
+	if (!pClient->InitSocket()) return FALSE;
+	pClient->Send(packet);
+	return 0;
+}
+
+int CClientController::SendCommandPacket(int nCmd, BOOL bAutoclose, BYTE* pData, size_t nLength)
+{
+	CClientSocket* pClient = CClientSocket::GetInstance();
+	if (!pClient) return FALSE;
+	if (!pClient->InitSocket()) return FALSE;
+	if (!pClient->Send(CPacket(nCmd, pData, nLength)))
+	{
+		TRACE("Client Send Paccket Failed\r\n");
+		return -1;
+	}
+	// get return msg from server
+	int cmd = DealCommand();
+	if (cmd == -1)
+	{
+		TRACE("Get Return msg from server failed\r\n");
+		return -1;
+	}
+	if (bAutoclose) CloseSocket();
+	return cmd;
+}
+
+/**
+* Memory to Image
+*/
+int CClientController::GetImage(CImage& img)
+{
+	return CUtils::Bytes2Image(img, CClientSocket::GetInstance()->GetPacket().strData);
 }
 
 void CClientController::ReleaseInstance()
@@ -127,12 +180,14 @@ UINT __stdcall CClientController::ThreadEntry(void* arg)
 
 LRESULT CClientController::OnSendPacket(UINT nMsg, WPARAM wParam, LPARAM lParam)
 {
-	return LRESULT();
+	CPacket* packet = (CPacket*)wParam;
+	return CClientSocket::GetInstance()->Send(*packet);
 }
 
 LRESULT CClientController::OnSendData(UINT nMsg, WPARAM wParam, LPARAM lParam)
 {
-	return LRESULT();
+	char *pBuf = (char*)wParam;
+	return CClientSocket::GetInstance()->Send(pBuf, (size_t)lParam);
 }
 
 LRESULT CClientController::OnShowtatus(UINT nMsg, WPARAM wParam, LPARAM lParam)

@@ -27,13 +27,13 @@ public:
 	CPacket& operator=(const CPacket& other);
 	~CPacket() {}
 	size_t Size() const;
-	const char* Data();
+	const char* Data(std::string &strOut) const;
 public:
 	WORD sHead;	// FE FF
 	DWORD nLength; // packet length
 	WORD sCmd; // conctrol command
 	std::string strData;
 	WORD sSum; // check sum / crc
-	std::string strOut;
+	//std::string strOut;
 };
 #pragma pack(pop)

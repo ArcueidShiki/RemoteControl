@@ -25,14 +25,15 @@ class CClientSocket
 public:
 	// static function no this pointer, belongs to class. can access non static member.
 	static CClientSocket* GetInstance();
-	BOOL InitSocket(ULONG ip, USHORT port);
+	BOOL InitSocket();
 	int DealCommand();
 	BOOL Send(const char* pData, size_t nSize);
-	BOOL Send(CPacket& packet);
+	BOOL Send(const CPacket& packet);
 	BOOL GetFilePath(std::string& strPath);
 	BOOL GetMouseEvent(MOUSEEV& mouse);
 	void CloseSocket();
 	CPacket& GetPacket() { return m_packet; }
+	void UpdateAddress(ULONG nIp, USHORT nPort);
 private:
 	// Initialize before main
 	// Singleton, private all constructors
@@ -52,4 +53,6 @@ private:
 	SOCKET m_socket;
 	CPacket m_packet;
 	std::vector<char> m_buf;
+	ULONG m_nIp;
+	USHORT m_nPort;
 };

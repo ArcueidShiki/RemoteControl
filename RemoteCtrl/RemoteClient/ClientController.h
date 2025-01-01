@@ -18,7 +18,13 @@ public:
 	static CClientController* GetInstance();
 	int InitController();
 	int Invoke(CWnd** pMainWnd);
-	LRESULT SendMessage(MSG msg, WPARAM wParam, LPARAM lParam);
+	LRESULT SendMsg(MSG msg);
+	void UpdateAddress(ULONG nIp, USHORT nPort);
+	int DealCommand();
+	void CloseSocket();
+	BOOL SendPacket(const CPacket& packet);
+	int SendCommandPacket(int nCmd, BOOL bAutoclose = TRUE, BYTE* pData = NULL, size_t nLength = 0);
+	int GetImage(CImage& img);
 protected:
 	static void ReleaseInstance();
 	CClientController();
