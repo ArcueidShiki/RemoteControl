@@ -48,7 +48,6 @@ protected:
 	CStatusDlg m_dlgStatus;
 
 private:
-	int SendCommandPacket(int nCmd, BOOL autoclose = TRUE, BYTE* pData = NULL, size_t nLength = 0);
 	CString GetPath(HTREEITEM hTree);
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
 	void LoadDirectory();
@@ -61,4 +60,7 @@ private:
 	CImage m_img;
 	BOOL m_isFull;
 	BOOL m_isClosed;
+public:
+	afx_msg void OnIpnFieldchangedIpaddressServ(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnEnChangeEditPort();
 };

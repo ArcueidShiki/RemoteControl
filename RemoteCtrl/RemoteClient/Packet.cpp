@@ -125,7 +125,7 @@ size_t CPacket::Size() const
 /**
 Only for dump packet data
 */
-const char* CPacket::Data()
+const char* CPacket::Data(std::string &strOut) const
 {
 	strOut.resize(Size());
 	BYTE* pData = (BYTE*)strOut.c_str();

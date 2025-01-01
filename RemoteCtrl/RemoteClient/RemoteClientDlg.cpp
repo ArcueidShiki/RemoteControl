@@ -8,6 +8,7 @@
 #include "RemoteClientDlg.h"
 #include "afxdialogex.h"
 #include "WatchDlg.h"
+#include "ClientController.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -56,6 +57,7 @@ CRemoteClientDlg::CRemoteClientDlg(CWnd* pParent /*=nullptr*/)
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	pClient = CClientSocket::GetInstance();
 	m_isFull = FALSE;
+	m_isClosed = FALSE;
 }
 
 void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
@@ -82,6 +84,8 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_COMMAND(ID_OPEN_FILE, &CRemoteClientDlg::OnOpenFile)
 	ON_MESSAGE(WM_SEND_PACKET, &CRemoteClientDlg::OnSendPacket)
 	ON_BN_CLICKED(IDC_BTN_START_WATCH, &CRemoteClientDlg::OnBnClickedBtnStartWatch)
+	ON_NOTIFY(IPN_FIELDCHANGED, IDC_IPADDRESS_SERV, &CRemoteClientDlg::OnIpnFieldchangedIpaddressServ)
+	ON_EN_CHANGE(IDC_EDIT_PORT, &CRemoteClientDlg::OnEnChangeEditPort)
 END_MESSAGE_MAP()
 
 
@@ -135,6 +139,7 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	m_port = _T("10000");
 	m_server_address = 0xC0A8027B; // 192.169.2.123, If using virtual box, set network mode to bridge.
 	UpdateData(FALSE);
+	CClientController::GetInstance()->UpdateAddress(m_server_address, static_cast<USHORT>(atoi(CW2A(m_port))));
 	m_dlgStatus.Create(IDD_DLG_STATUS, this);
 	m_dlgStatus.ShowWindow(SW_HIDE);
 	return TRUE;  // return TRUE  unless you set the focus to a control
@@ -191,12 +196,12 @@ HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 
 void CRemoteClientDlg::OnBnClickedBtnTest()
 {
-	SendCommandPacket(CMD_DRIVER);
+	CClientController::GetInstance()->SendCommandPacket(CMD_DRIVER);
 }
 
 void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 {
-	if (SendCommandPacket(CMD_DRIVER) == -1)
+	if (CClientController::GetInstance()->SendCommandPacket(CMD_DRIVER) == -1)
 	{
 		AfxMessageBox(_T("Send Command Packet Failed"));
 		return;
@@ -216,43 +221,6 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 		}
 	}
 	UpdateData(FALSE);
-}
-
-int CRemoteClientDlg::SendCommandPacket(int nCmd, BOOL autoclose, BYTE* pData, size_t nLength)
-{
-	// default TRUE: push value from componets to m_var, FALSE: pull value from m_var to components
-	UpdateData();
-	if (!pClient)
-	{
-		TRACE("pClient is Null");
-		return -1;
-	}
-	USHORT port = static_cast<USHORT>(atoi(CW2A(m_port)));
-	//TRACE("Client Socket Instance Success: ip:%08X, port:%d\r\n", m_server_address, port);
-	if (!pClient->InitSocket(m_server_address, port))
-	{
-		TRACE("Client Init Socket Failed");
-		return -1;
-	}
-
-	CPacket packet(nCmd, pData, nLength);
-	if (!pClient->Send(packet))
-	{
-		TRACE("Client Send Paccket Failed\r\n");
-		return -1;
-	}
-	// get return msg from server
-	int ret = pClient->DealCommand();
-	if (ret == -1)
-	{
-		TRACE("Get Return msg from server failed: ret = %d\r\n", ret);
-		return -1;
-	}
-	if (autoclose)
-	{
-		pClient->CloseSocket();
-	}
-	return nCmd;
 }
 
 /**
@@ -306,7 +274,7 @@ void CRemoteClientDlg::LoadDirectory()
 	const char* path = asciiPath;
 	size_t strLen = strlen(asciiPath);
 	TRACE("strPath: %s Length: %zu\n", path, strLen);
-	int nCmd = SendCommandPacket(CMD_DIR, FALSE, (BYTE*)path, strLen);
+	int nCmd = CClientController::GetInstance()->SendCommandPacket(CMD_DIR, FALSE, (BYTE*)path, strLen);
 	PFILEINFO pInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
 	int id = 0;
 	while (pInfo->HasNext)
@@ -325,7 +293,7 @@ void CRemoteClientDlg::LoadDirectory()
 			//TRACE("Insert Directory:%s\n", pInfo->szFileName);
 			m_tree.InsertItem(L"", hCur, TVI_LAST);
 		}
-		int cmd = pClient->DealCommand();
+		int cmd = CClientController::GetInstance()->DealCommand();
 		if (cmd < 0) break;
 		pInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
 	}
@@ -340,7 +308,7 @@ void CRemoteClientDlg::LoadFiles()
 	const char* path = asciiPath;
 	size_t strLen = strlen(asciiPath);
 	TRACE("strPath: %s Length: %zu\n", path, strLen);
-	int nCmd = SendCommandPacket(CMD_DIR, FALSE, (BYTE*)path, strLen);
+	int nCmd = CClientController::GetInstance()->SendCommandPacket(CMD_DIR, FALSE, (BYTE*)path, strLen);
 	PFILEINFO pInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
 	int id = 0;
 	while (pInfo->HasNext)
@@ -352,7 +320,7 @@ void CRemoteClientDlg::LoadFiles()
 			//TRACE("Insert file:%s\n", pInfo->szFileName);
 			m_list.InsertItem(0, CString(pInfo->szFileName));
 		}
-		int cmd = pClient->DealCommand();
+		int cmd = CClientController::GetInstance()->DealCommand();
 		TRACE("Client Deal Command [ACK]: [%d]\n", cmd);
 		if (cmd < 0) break;
 		pInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
@@ -410,8 +378,7 @@ void CRemoteClientDlg::ThreadDownloadFile()
 		char* filepath = asciiFullPath;
 		size_t len = strlen(filepath);
 		TRACE("Full File Path : [%s], name len:[%zu]\n", filepath, len);
-		LRESULT ret = SendMessage(WM_SEND_PACKET, CMD_DLD_FILE << 1, (LPARAM)filepath);
-		//int ret = SendCommandPacket(CMD_DLD_FILE, FALSE, (BYTE*)filepath, len);
+		int ret = CClientController::GetInstance()->SendCommandPacket(CMD_DLD_FILE, FALSE, (BYTE*)filepath, len);
 		if (ret < 0)
 		{
 			AfxMessageBox(L"Donwload File Failed");
@@ -433,7 +400,7 @@ void CRemoteClientDlg::ThreadDownloadFile()
 		long long nCount = 0;
 		while (nCount < nLength)
 		{
-			ret = pClient->DealCommand();
+			ret = CClientController::GetInstance()->DealCommand();
 			if (ret < 0)
 			{
 				AfxMessageBox(L"Transmission Failed\n");
@@ -451,6 +418,7 @@ void CRemoteClientDlg::ThreadDownloadFile()
 	m_dlgStatus.ShowWindow(SW_HIDE);
 	EndWaitCursor();
 	MessageBox(_T("Download File Success"), _T("Download Finish"));
+	CClientController::GetInstance()->CloseSocket();
 }
 
 /**
@@ -459,42 +427,24 @@ void CRemoteClientDlg::ThreadDownloadFile()
 void CRemoteClientDlg::ThreadWatchData()
 {
 	Sleep(50);
-	do {
-		pClient = CClientSocket::GetInstance();
-	} while (!pClient);
+	CClientController* pController = CClientController::GetInstance();
 	while (!m_isClosed)
 	{
-		if (m_isFull)
+		if (!m_isFull)
 		{
-			Sleep(1);
-			continue;
-		}
-		LRESULT ret = SendMessage(WM_SEND_PACKET, CMD_SEND_SCREEN << 1, 0);
-		if (ret == CMD_SEND_SCREEN)
-		{
-			if (!m_isFull)
+			int ret = pController->SendCommandPacket(CMD_SEND_SCREEN, FALSE, NULL, 0);
+			//LRESULT ret = SendMessage(WM_SEND_PACKET, CMD_SEND_SCREEN << 1, 0);
+			if (ret == CMD_SEND_SCREEN)
 			{
-				// update data ti cache
-				BYTE* pData = (BYTE*)pClient->GetPacket().strData.c_str();
-				HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
-				if (hMem == NULL)
+
+				if (pController->GetImage(m_img) == 0)
 				{
-					TRACE("Insufficient Memory GlobalAlloc failed\n");
-					Sleep(1);
-					continue;
-				}
-				IStream* pStream = NULL;
-				HRESULT hRet = CreateStreamOnHGlobal(hMem, TRUE, &pStream);
-				if (hRet == S_OK)
-				{
-					ULONG written = 0;
-					ULONG len = (ULONG)pClient->GetPacket().strData.size();
-					pStream->Write(pData, len, &written);
-					LARGE_INTEGER li = { 0 };
-					pStream->Seek(li, STREAM_SEEK_SET, NULL);
-					if ((HBITMAP)m_img != NULL) m_img.Destroy();
-					m_img.Load(pStream);
 					m_isFull = TRUE;
+				}
+				else
+				{
+					// m_isFull Set to False at OnTimer
+					TRACE("Get Image Failed\n");
 				}
 			}
 		}
@@ -558,7 +508,7 @@ void CRemoteClientDlg::OnDeleteFile()
 	char* fullpath = asciiFullPath;
 	// wcstombs_s(&nConverted, fullpath, MAX_PATH, asciiFullPath, MAX_PATH);
 	TRACE("Full File Path : [%s], name len:[%zu]\n", fullpath, strlen(fullpath));
-	int ret = SendCommandPacket(CMD_DEL_FILE, TRUE, (BYTE*)fullpath, strlen(fullpath));
+	int ret = CClientController::GetInstance()->SendCommandPacket(CMD_DEL_FILE, TRUE, (BYTE*)fullpath, strlen(fullpath));
 	if (ret < 0)
 	{
 		AfxMessageBox(L"Delete File Failed");
@@ -577,7 +527,7 @@ void CRemoteClientDlg::OnOpenFile()
 	CT2A asciiFullPath(dirPath + strFile);
 	char* fullpath = asciiFullPath;
 	TRACE("Full File Path : [%s], name len:[%zu]\n", fullpath, strlen(fullpath));
-	int ret = SendCommandPacket(CMD_RUN_FILE, TRUE, (BYTE*)fullpath, strlen(fullpath));
+	int ret = CClientController::GetInstance()->SendCommandPacket(CMD_RUN_FILE, TRUE, (BYTE*)fullpath, strlen(fullpath));
 	if (ret < 0)
 	{
 		AfxMessageBox(L"Open File Failed");
@@ -595,19 +545,19 @@ LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)
 	case CMD_DLD_FILE:
 	{
 		LPCSTR filepath = (LPCSTR)lParam;
-		ret = SendCommandPacket(cmd, autoclose, (BYTE*)lParam, strlen(filepath));
+		ret = CClientController::GetInstance()->SendCommandPacket(cmd, autoclose, (BYTE*)lParam, strlen(filepath));
 		break;
 	}
 	case CMD_MOUSE:
 	{
-		ret = SendCommandPacket(cmd, autoclose, (BYTE*)lParam, sizeof(MOUSEEV));
+		ret = CClientController::GetInstance()->SendCommandPacket(cmd, autoclose, (BYTE*)lParam, sizeof(MOUSEEV));
 		break;
 	}
 	case CMD_SEND_SCREEN:
 	case CMD_LOCK_MACHINE:
 	case CMD_UNLOCK_MACHINE:
 	{
-		ret = SendCommandPacket(cmd, autoclose);
+		ret = CClientController::GetInstance()->SendCommandPacket(cmd, autoclose);
 		break;
 	}
 	default:
@@ -625,4 +575,25 @@ void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 	dlg.DoModal();
 	m_isClosed = TRUE;
 	WaitForSingleObject(hThread, 500);
+}
+
+
+void CRemoteClientDlg::OnIpnFieldchangedIpaddressServ(NMHDR* pNMHDR, LRESULT* pResult)
+{
+	LPNMIPADDRESS pIPAddr = reinterpret_cast<LPNMIPADDRESS>(pNMHDR);
+	*pResult = 0;
+	// default TRUE: push value from componets to m_var, FALSE: pull value from m_var to components
+	UpdateData();
+	CClientController::GetInstance()->UpdateAddress(m_server_address, static_cast<USHORT>(atoi(CW2A(m_port))));
+}
+
+
+void CRemoteClientDlg::OnEnChangeEditPort()
+{
+	// TODO:  If this is a RICHEDIT control, the control will not
+	// send this notification unless you override the CDialogEx::OnInitDialog()
+	// function and call CRichEditCtrl().SetEventMask()
+	// with the ENM_CHANGE flag ORed into the mask.
+	UpdateData();
+	CClientController::GetInstance()->UpdateAddress(m_server_address, static_cast<USHORT>(atoi(CW2A(m_port))));
 }

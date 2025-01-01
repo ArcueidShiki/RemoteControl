@@ -10,6 +10,8 @@ CClientSocket::CHelper CClientSocket::m_helper;
 
 CClientSocket::CClientSocket()
 	: m_socket(INVALID_SOCKET)
+	, m_nIp(INADDR_ANY)
+	, m_nPort(0)
 {
 	if (!InitSocketEnv())
 	{
@@ -23,6 +25,8 @@ CClientSocket::CClientSocket()
 CClientSocket::CClientSocket(const CClientSocket& other)
 { 
 	m_socket = other.m_socket;
+	m_nIp = other.m_nIp;
+	m_nPort = other.m_nPort;
 }
 
 CClientSocket& CClientSocket::operator=(const CClientSocket& other)
@@ -30,6 +34,8 @@ CClientSocket& CClientSocket::operator=(const CClientSocket& other)
 	if (this != &other)
 	{
 		m_socket = other.m_socket;
+		m_nIp = other.m_nIp;
+		m_nPort = other.m_nPort;
 	}
 	return *this;
 }
@@ -102,7 +108,7 @@ std::string GetErrorInfo(int wsaErrCode)
 	return ret;
 }
 
-BOOL CClientSocket::InitSocket(ULONG ip, USHORT port)
+BOOL CClientSocket::InitSocket()
 {
 	if (m_socket != INVALID_SOCKET)
 	{
@@ -117,8 +123,8 @@ BOOL CClientSocket::InitSocket(ULONG ip, USHORT port)
 	SOCKADDR_IN serv_addr;
 	memset(&serv_addr, 0, sizeof(serv_addr));
 	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.S_un.S_addr = htonl(ip);
-	serv_addr.sin_port = htons(port);	// default port
+	serv_addr.sin_addr.S_un.S_addr = htonl(m_nIp);
+	serv_addr.sin_port = htons(m_nPort);	// default port
 	if (serv_addr.sin_addr.S_un.S_addr == INADDR_NONE)
 	{
 		AfxMessageBox(_T("Invalid IP Address"));
@@ -198,13 +204,15 @@ BOOL CClientSocket::Send(const char* pData, size_t nSize)
 	return send(m_socket, pData, (int)nSize, 0) != SOCKET_ERROR;
 }
 
-BOOL CClientSocket::Send(CPacket& packet)
+BOOL CClientSocket::Send(const CPacket& packet)
 {
 	if (m_socket == INVALID_SOCKET) {
 		TRACE("Client Socket Invalid\n");
 		return FALSE;
 	}
-	return send(m_socket, packet.Data(), (int)packet.Size(), 0) != SOCKET_ERROR;
+	std::string strOut;
+	packet.Data(strOut);
+	return send(m_socket, strOut.c_str(), strOut.size(), 0) != SOCKET_ERROR;
 }
 
 BOOL CClientSocket::GetFilePath(std::string& strPath)
@@ -235,4 +243,10 @@ void CClientSocket::CloseSocket()
 {
 	closesocket(m_socket);
 	m_socket = INVALID_SOCKET;
+}
+
+void CClientSocket::UpdateAddress(ULONG nIp, USHORT nPort)
+{
+	m_nIp = nIp;
+	m_nPort = nPort;
 }
