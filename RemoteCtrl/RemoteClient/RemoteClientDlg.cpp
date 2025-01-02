@@ -253,12 +253,11 @@ void CRemoteClientDlg::LoadDirectory()
 	const char* path = asciiPath;
 	size_t strLen = strlen(asciiPath);
 	TRACE("strPath: %s Length: %zu\n", path, strLen);
-	std::list<CPacket> lstPackets;
-	int nCmd = CClientController::GetInstance()->SendCommandPacket(CMD_DIR, (BYTE*)path, strLen, &lstPackets);
-	PFILEINFO pInfo = (PFILEINFO)lstPackets.front().strData.c_str();
-	lstPackets.pop_front();
+	std::list<CPacket> lstAcks;
+	int nCmd = CClientController::GetInstance()->SendCommandPacket(CMD_DIR, (BYTE*)path, strLen, &lstAcks, FALSE);
+	PFILEINFO pInfo = (PFILEINFO)lstAcks.front().strData.c_str();
 	int id = 0;
-	while (pInfo->HasNext && !lstPackets.empty())
+	while (pInfo->HasNext && !lstAcks.empty())
 	{
 		TRACE("Client receive file id: [%d], name: [%s] Has Next: [%d] \n", ++id, pInfo->szFileName, pInfo->HasNext);
 		if (!pInfo->IsDirectory)
@@ -274,10 +273,9 @@ void CRemoteClientDlg::LoadDirectory()
 			//TRACE("Insert Directory:%s\n", pInfo->szFileName);
 			m_tree.InsertItem(L"", hCur, TVI_LAST);
 		}
-		int cmd = CClientController::GetInstance()->DealCommand();
-		if (cmd < 0) break;
-		pInfo = (PFILEINFO)lstPackets.front().strData.c_str();
-		lstPackets.pop_front();
+		lstAcks.pop_front();
+		if (lstAcks.empty()) break;
+		pInfo = (PFILEINFO)lstAcks.front().strData.c_str();
 	}
 }
 
@@ -290,12 +288,11 @@ void CRemoteClientDlg::LoadFiles()
 	const char* path = asciiPath;
 	size_t strLen = strlen(asciiPath);
 	TRACE("strPath: %s Length: %zu\n", path, strLen);
-	std::list<CPacket> lstPackets;
-	int nCmd = CClientController::GetInstance()->SendCommandPacket(CMD_DIR, (BYTE*)path, strLen, &lstPackets);
-	PFILEINFO pInfo = (PFILEINFO)lstPackets.front().strData.c_str();
+	std::list<CPacket> lstAcks;
+	int nCmd = CClientController::GetInstance()->SendCommandPacket(CMD_DIR, (BYTE*)path, strLen, &lstAcks);
+	PFILEINFO pInfo = (PFILEINFO)lstAcks.front().strData.c_str();
 	int id = 0;
-	lstPackets.pop_front();
-	while (pInfo->HasNext && !lstPackets.empty())
+	while (pInfo->HasNext && !lstAcks.empty())
 	{
 		//TRACE("Client receive file id: [%d], name: [%s] Has Next: [%d] \n", ++id, pInfo->szFileName, pInfo->HasNext);
 		if (!pInfo->IsDirectory)
@@ -304,11 +301,9 @@ void CRemoteClientDlg::LoadFiles()
 			//TRACE("Insert file:%s\n", pInfo->szFileName);
 			m_list.InsertItem(0, CString(pInfo->szFileName));
 		}
-		int cmd = CClientController::GetInstance()->DealCommand();
-		TRACE("Client Deal Command [ACK]: [%d]\n", cmd);
-		if (cmd < 0) break;
-		pInfo = (PFILEINFO)lstPackets.front().strData.c_str();
-		lstPackets.pop_front();
+		lstAcks.pop_front();
+		if (lstAcks.empty()) break;
+		pInfo = (PFILEINFO)lstAcks.front().strData.c_str();
 	}
 }
 
