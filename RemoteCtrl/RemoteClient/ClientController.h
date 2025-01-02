@@ -25,12 +25,18 @@ public:
 	BOOL SendPacket(const CPacket& packet);
 	int SendCommandPacket(int nCmd, BOOL bAutoclose = TRUE, BYTE* pData = NULL, size_t nLength = 0);
 	int GetImage(CImage& img);
+	int DownloadFile(CString strPath);
+	void StartWatchScreen();
 protected:
 	static void ReleaseInstance();
 	CClientController();
 	~CClientController();
 	void ThreadFunc();
+	void ThreadDownloadFile();
+	static void __stdcall ThreadDownloadEntry(void* arg);
 	static UINT __stdcall ThreadEntry(void* arg);
+	void ThreadWatchScreen();
+	static void __stdcall ThreadWatchScreenEntry(void* arg);
 	LRESULT OnSendPacket(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	LRESULT OnSendData(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	LRESULT OnShowtatus(UINT nMsg, WPARAM wParam, LPARAM lParam);
@@ -55,7 +61,12 @@ private:
 	CRemoteClientDlg m_clientDlg;
 	CStatusDlg m_statusDlg;
 	HANDLE m_hThread;
+	HANDLE m_hThreadDownload;
+	HANDLE m_hThreadWatch;
 	UINT m_tid;
 	static CHelper m_helper;
+	char *m_localPath;
+	char *m_remotePath;
+	BOOL m_isWatchDlgClosed;
 };
 

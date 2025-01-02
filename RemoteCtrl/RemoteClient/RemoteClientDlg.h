@@ -28,9 +28,9 @@ public:
 	afx_msg void OnOpenFile();
 	afx_msg LRESULT OnSendPacket(WPARAM wParam, LPARAM lParam);
 	afx_msg void OnBnClickedBtnStartWatch();
-	BOOL isFull() const;
+	BOOL isImageBufFull() const;
 	CImage& GetImage();
-	void SetImageStatus(BOOL isFull = TRUE);
+	void SetIsImageBufFull(BOOL isFull = TRUE);
 	CListCtrl m_list;
 	CTreeCtrl m_tree;
 	CString m_port;
@@ -52,13 +52,9 @@ private:
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
 	void LoadDirectory();
 	void LoadFiles();
-	static void ThreadEntryDownloadFile(void* arg);
-	static void ThreadEntryWatchData(void* arg);
-	void ThreadDownloadFile();
-	void ThreadWatchData();
 	CClientSocket* pClient;
 	CImage m_img;
-	BOOL m_isFull;
+	BOOL m_isImageBufFull;
 	BOOL m_isClosed;
 public:
 	afx_msg void OnIpnFieldchangedIpaddressServ(NMHDR* pNMHDR, LRESULT* pResult);

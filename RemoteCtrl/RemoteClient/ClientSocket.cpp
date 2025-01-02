@@ -212,7 +212,7 @@ BOOL CClientSocket::Send(const CPacket& packet)
 	}
 	std::string strOut;
 	packet.Data(strOut);
-	return send(m_socket, strOut.c_str(), strOut.size(), 0) != SOCKET_ERROR;
+	return send(m_socket, strOut.c_str(), (int)strOut.size(), 0) != SOCKET_ERROR;
 }
 
 BOOL CClientSocket::GetFilePath(std::string& strPath)

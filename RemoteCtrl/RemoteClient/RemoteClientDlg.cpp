@@ -56,7 +56,7 @@ CRemoteClientDlg::CRemoteClientDlg(CWnd* pParent /*=nullptr*/)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	pClient = CClientSocket::GetInstance();
-	m_isFull = FALSE;
+	m_isImageBufFull = FALSE;
 	m_isClosed = FALSE;
 }
 
@@ -91,9 +91,9 @@ END_MESSAGE_MAP()
 
 // CRemoteClientDlg message handlers
 
-BOOL CRemoteClientDlg::isFull() const
+BOOL CRemoteClientDlg::isImageBufFull() const
 {
-	return m_isFull;
+	return m_isImageBufFull;
 }
 
 CImage& CRemoteClientDlg::GetImage()
@@ -101,9 +101,9 @@ CImage& CRemoteClientDlg::GetImage()
 	return m_img;
 }
 
-void CRemoteClientDlg::SetImageStatus(BOOL isFull)
+void CRemoteClientDlg::SetIsImageBufFull(BOOL isFull)
 {
-	m_isFull = isFull;
+	m_isImageBufFull = isFull;
 }
 
 BOOL CRemoteClientDlg::OnInitDialog()
@@ -327,134 +327,6 @@ void CRemoteClientDlg::LoadFiles()
 	}
 }
 
-void CRemoteClientDlg::ThreadEntryDownloadFile(void* arg)
-{
-	CRemoteClientDlg* pThis = (CRemoteClientDlg*)arg;
-	pThis->ThreadDownloadFile();
-	_endthread();
-}
-
-void CRemoteClientDlg::ThreadEntryWatchData(void* arg)
-{
-	CRemoteClientDlg* pThis = (CRemoteClientDlg*)arg;
-	pThis->ThreadWatchData();
-	// Thread might not end.
-	_endthread();
-}
-
-void CRemoteClientDlg::ThreadDownloadFile()
-{
-	int nListSelected = m_list.GetSelectionMark();
-	CString strFile = m_list.GetItemText(nListSelected, 0);
-	// Need a dlg;
-	// False for Save sa, "extension", "filename", flags, filter, parent
-	CFileDialog dlg(FALSE, L"*", strFile, OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, NULL, this);
-	if (dlg.DoModal() == IDOK) // need handle first, cannot move to other window
-	{
-		FILE* pFile;
-		CT2A DPath(dlg.GetPathName());
-		char* downloadPath = DPath;
-		int err = fopen_s(&pFile, downloadPath, "wb+");
-		if (err != 0 || pFile == NULL)
-		{
-			AfxMessageBox(L"Open Dlg File Failed\n");
-			TRACE("Open Download Path : [%s] Failed\n", downloadPath);
-			m_dlgStatus.ShowWindow(SW_HIDE);
-			EndWaitCursor();
-			return;
-		}
-
-		HTREEITEM hTreeSelected = m_tree.GetSelectedItem();
-		if (hTreeSelected == NULL)
-		{
-			AfxMessageBox(L"No Tree Item Selected\n");
-			TRACE("Download File Failed, No Item Selected\n");
-			m_dlgStatus.ShowWindow(SW_HIDE);
-			EndWaitCursor();
-			return;
-		}
-
-		CW2A asciiFullPath(GetPath(hTreeSelected) + strFile);
-		char* filepath = asciiFullPath;
-		size_t len = strlen(filepath);
-		TRACE("Full File Path : [%s], name len:[%zu]\n", filepath, len);
-		int ret = CClientController::GetInstance()->SendCommandPacket(CMD_DLD_FILE, FALSE, (BYTE*)filepath, len);
-		if (ret < 0)
-		{
-			AfxMessageBox(L"Donwload File Failed");
-			TRACE("Download File Failed ret = %d\n", ret);
-			m_dlgStatus.ShowWindow(SW_HIDE);
-			EndWaitCursor();
-			return;
-		}
-		auto nLength = *(long long*)pClient->GetPacket().strData.c_str();
-		if (nLength == 0)
-		{
-			AfxMessageBox(L"File size is Zero or Download File Failed");
-			TRACE("Download File Failed, File Size = 0\n");
-			m_dlgStatus.ShowWindow(SW_HIDE);
-			EndWaitCursor();
-			return;
-		}
-		TRACE("Client Filename:[%s], size:[%lld]\n", filepath, nLength);
-		long long nCount = 0;
-		while (nCount < nLength)
-		{
-			ret = CClientController::GetInstance()->DealCommand();
-			if (ret < 0)
-			{
-				AfxMessageBox(L"Transmission Failed\n");
-				TRACE("Download File Failed, Deal Command Failed ret = %d\n", ret);
-				m_dlgStatus.ShowWindow(SW_HIDE);
-				EndWaitCursor();
-				break;
-			}
-			std::string data = pClient->GetPacket().strData;
-			nCount += data.size();
-			fwrite(data.c_str(), 1, data.size(), pFile);
-		}
-		fclose(pFile);
-	}
-	m_dlgStatus.ShowWindow(SW_HIDE);
-	EndWaitCursor();
-	MessageBox(_T("Download File Success"), _T("Download Finish"));
-	CClientController::GetInstance()->CloseSocket();
-}
-
-/**
-* Receiving data from server
-*/
-void CRemoteClientDlg::ThreadWatchData()
-{
-	Sleep(50);
-	CClientController* pController = CClientController::GetInstance();
-	while (!m_isClosed)
-	{
-		if (!m_isFull)
-		{
-			int ret = pController->SendCommandPacket(CMD_SEND_SCREEN, FALSE, NULL, 0);
-			//LRESULT ret = SendMessage(WM_SEND_PACKET, CMD_SEND_SCREEN << 1, 0);
-			if (ret == CMD_SEND_SCREEN)
-			{
-
-				if (pController->GetImage(m_img) == 0)
-				{
-					m_isFull = TRUE;
-				}
-				else
-				{
-					// m_isFull Set to False at OnTimer
-					TRACE("Get Image Failed\n");
-				}
-			}
-		}
-		else
-		{
-			Sleep(1);
-		}
-	}
-}
-
 void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	*pResult = 0;
@@ -490,12 +362,21 @@ void CRemoteClientDlg::OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult)
 
 void CRemoteClientDlg::OnDownloadFile()
 {
-	_beginthread(CRemoteClientDlg::ThreadEntryDownloadFile, 0, this);
-	BeginWaitCursor(); // set cursort to circle represent waiting...
-	m_dlgStatus.m_info.SetWindowText(L"Downloading...");
-	m_dlgStatus.ShowWindow(SW_SHOW); // active window accept keyboard input
-	m_dlgStatus.CenterWindow();
-	m_dlgStatus.SetActiveWindow();
+	int nListSelected = m_list.GetSelectionMark();
+	CString strFile = m_list.GetItemText(nListSelected, 0);
+	HTREEITEM hTreeSelected = m_tree.GetSelectedItem();
+	CString strPath = GetPath(hTreeSelected) + strFile;
+
+	int ret = CClientController::GetInstance()->DownloadFile(strPath);
+	if (ret != 0)
+	{
+		MessageBox(_T("Download File Failed"), _T("Download Failed"));
+		TRACE("Download Failed ret = %d\r\n", ret);
+	}
+	else
+	{
+		MessageBox(_T("Download File Success"), _T("Download Success"));
+	}
 }
 
 void CRemoteClientDlg::OnDeleteFile()
@@ -568,13 +449,7 @@ LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)
 
 void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 {
-	m_isClosed = FALSE;
-	CWatchDlg dlg(this);
-	HANDLE hThread = (HANDLE)_beginthread(CRemoteClientDlg::ThreadEntryWatchData, 0, this);
-	//GetDlgItem(IDC_BTN_START_WATCH)->EnableWindow(FALSE);
-	dlg.DoModal();
-	m_isClosed = TRUE;
-	WaitForSingleObject(hThread, 500);
+	CClientController::GetInstance()->StartWatchScreen();
 }
 
 
