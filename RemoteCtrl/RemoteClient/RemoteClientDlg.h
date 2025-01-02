@@ -3,7 +3,6 @@
 //
 
 #pragma once
-#include "ClientSocket.h"
 #include "StatusDlg.h"
 
 // CRemoteClientDlg dialog
@@ -25,7 +24,6 @@ public:
 	afx_msg void OnDeleteFile();
 	afx_msg void OnOpenFile();
 	afx_msg void OnBnClickedBtnStartWatch();
-	CImage& GetImage();
 	CListCtrl m_list;
 	CTreeCtrl m_tree;
 	CString m_port;
@@ -47,8 +45,6 @@ private:
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
 	void LoadDirectory();
 	void LoadFiles();
-	CClientSocket* pClient;
-	CImage m_img;
 public:
 	afx_msg void OnIpnFieldchangedIpaddressServ(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnEnChangeEditPort();

@@ -20,7 +20,7 @@ public:
 	int DealCommand();
 	void CloseSocket();
 	int SendCommandPacket(int nCmd, BYTE* pData = NULL, size_t nLength = 0,
-						  std::list<CPacket> *pLstAcks = NULL);
+						  std::list<CPacket> *pLstAcks = NULL, BOOL bAutoClose = TRUE);
 	int GetImage(CImage& img);
 	int DownloadFile(CString strPath);
 	void StartWatchScreen();

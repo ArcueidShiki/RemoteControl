@@ -99,26 +99,16 @@ void CWatchDlg::OnTimer(UINT_PTR nIDEvent)
 		{
 			CRect rect;
 			m_picture.GetWindowRect(&rect);
-			if (m_nRemoteWidth == -1)
-			{
-				m_nRemoteWidth = pParent->GetImage().GetWidth();
-			}
-			if (m_nRemoteHeight == -1)
-			{
-				m_nRemoteHeight = pParent->GetImage().GetHeight();
-			}
-			//pParent->GetImage().BitBlt(m_picture.GetDC()->GetSafeHdc(), 0, 0, SRCCOPY);
-			pParent->GetImage().StretchBlt(m_picture.GetDC()->GetSafeHdc(), 0, 0, rect.Width(), rect.Height(), SRCCOPY);
+			m_nRemoteWidth = m_img.GetWidth();
+			m_nRemoteHeight = m_img.GetHeight();
+			m_img.StretchBlt(m_picture.GetDC()->GetSafeHdc(), 0, 0, rect.Width(), rect.Height(), SRCCOPY);
 			m_picture.InvalidateRect(NULL);
-			pParent->GetImage().Destroy();
+			m_img.Destroy();
 			m_isImageBufFull = FALSE;
 		}
 	}
 	CDialog::OnTimer(nIDEvent);
 }
-
-// Should be tested on vmware window >= 10
-// network communication should be decoupled with dlg UI.
 
 void CWatchDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 {
