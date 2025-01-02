@@ -72,7 +72,7 @@ void CWatchDlg::OnTimer(UINT_PTR nIDEvent)
 	if (nIDEvent == 0)
 	{
 		CRemoteClientDlg* pParent = (CRemoteClientDlg*)GetParent();
-		if (pParent->isFull())
+		if (pParent->isImageBufFull())
 		{
 			CRect rect;
 			m_picture.GetWindowRect(&rect);
@@ -88,7 +88,7 @@ void CWatchDlg::OnTimer(UINT_PTR nIDEvent)
 			pParent->GetImage().StretchBlt(m_picture.GetDC()->GetSafeHdc(), 0, 0, rect.Width(), rect.Height(), SRCCOPY);
 			m_picture.InvalidateRect(NULL);
 			pParent->GetImage().Destroy();
-			pParent->SetImageStatus(FALSE);
+			pParent->SetIsImageBufFull(FALSE);
 		}
 	}
 	CDialog::OnTimer(nIDEvent);
