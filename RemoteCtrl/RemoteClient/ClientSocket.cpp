@@ -85,6 +85,10 @@ void CClientSocket::ThreadFunc()
 			}
 			// TODO it null check
 			auto it = m_mapAck.find(head.hEvent);
+			if (it == m_mapAck.end())
+			{
+				continue;
+			}
 			BOOL autoClose = m_mapAutoClose[head.hEvent];
 			do {
 				int n_recv = recv(m_socket, pBuf + index, BUF_SIZE - index, 0);
@@ -98,7 +102,7 @@ void CClientSocket::ThreadFunc()
 						// Set specific event to signaled state, Allows any threads that are waiting on
 						// the event to be release and continue execution, kind like condition variable
 						packet.hEvent = head.hEvent;
-						it->second.emplace_back(std::move(packet));
+						it->second->emplace_back(std::move(packet));
 						// receive one packet over.
 						if (autoClose)
 						{
@@ -131,6 +135,7 @@ void CClientSocket::ThreadFunc()
 			InitSocket();
 			m_queueSend.pop();
 			SetEvent(head.hEvent);
+			m_mapAutoClose.erase(head.hEvent);
 		}
 	}
 	CloseSocket();
@@ -348,18 +353,13 @@ BOOL CClientSocket::SendPacket(const CPacket& packet, std::list<CPacket> *lstAck
 	{
 		_beginthread(&CClientSocket::ThreadEntry, 0, this);
 	}
-	auto pair = m_mapAck.insert(std::pair<HANDLE, std::list<CPacket>>(packet.hEvent, *lstAcks)).first;
+	auto pair = m_mapAck.insert(std::pair<HANDLE, std::list<CPacket>*>(packet.hEvent, lstAcks)).first;
 	m_mapAutoClose.insert(std::pair<HANDLE, BOOL>(packet.hEvent, bAutoClose));
 	m_queueSend.push(packet);
 	WaitForSingleObject(packet.hEvent, INFINITE);
 	auto it = m_mapAck.find(packet.hEvent);
 	if (it != m_mapAck.end())
 	{
-		for (auto& p : it->second)
-		{
-			// this return to client call for ack.
-			lstAcks->push_back(p);
-		}
 		m_mapAck.erase(it);
 		return TRUE;
 	}
