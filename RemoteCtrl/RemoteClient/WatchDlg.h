@@ -34,7 +34,7 @@ public:
 	void SetIsImageBufFull(BOOL isFull = TRUE);
 	void OnOK();
 	CStatic m_picture;
-
+	CImage& GetImage() { return m_img; }
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
 
@@ -43,4 +43,5 @@ private:
 	int m_nRemoteWidth;
 	int m_nRemoteHeight;
 	BOOL m_isImageBufFull;
+	CImage m_img;
 };

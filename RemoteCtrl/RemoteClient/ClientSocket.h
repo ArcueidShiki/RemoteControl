@@ -38,7 +38,7 @@ public:
 	void CloseSocket();
 	CPacket& GetPacket() { return m_packet; }
 	void UpdateAddress(ULONG nIp, USHORT nPort);
-	BOOL SendPacket(const CPacket &packet, std::list<CPacket> *lstPackets);
+	BOOL SendPacket(const CPacket &packet, std::list<CPacket> *lstAcks, BOOL bAutoClose = TRUE);
 private:
 	// Initialize before main
 	// Singleton, private all constructors
@@ -62,6 +62,8 @@ private:
 	std::vector<char> m_buf;
 	ULONG m_nIp;
 	USHORT m_nPort;
+	BOOL m_isAutoClose;
 	std::map<HANDLE, std::list<CPacket>> m_mapAck;
+	std::map<HANDLE, BOOL> m_mapAutoClose;
 	std::queue<CPacket> m_queueSend;
 };

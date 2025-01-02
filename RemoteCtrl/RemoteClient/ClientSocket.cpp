@@ -12,6 +12,7 @@ CClientSocket::CClientSocket()
 	: m_socket(INVALID_SOCKET)
 	, m_nIp(INADDR_ANY)
 	, m_nPort(0)
+	, m_isAutoClose(TRUE)
 {
 	if (!InitSocketEnv())
 	{
@@ -27,6 +28,7 @@ CClientSocket::CClientSocket(const CClientSocket& other)
 	m_socket = other.m_socket;
 	m_nIp = other.m_nIp;
 	m_nPort = other.m_nPort;
+	m_isAutoClose = other.m_isAutoClose;
 }
 
 CClientSocket& CClientSocket::operator=(const CClientSocket& other)
@@ -36,6 +38,7 @@ CClientSocket& CClientSocket::operator=(const CClientSocket& other)
 		m_socket = other.m_socket;
 		m_nIp = other.m_nIp;
 		m_nPort = other.m_nPort;
+		m_isAutoClose = other.m_isAutoClose;
 	}
 	return *this;
 }
@@ -69,6 +72,7 @@ void CClientSocket::ThreadFunc()
 	strBuf.resize(BUF_SIZE);
 	char* pBuf = const_cast<char *>(strBuf.c_str());
 	int index = 0;
+	InitSocket();
 	while (m_socket != INVALID_SOCKET)
 	{
 		if (m_queueSend.size() > 0)
@@ -79,40 +83,46 @@ void CClientSocket::ThreadFunc()
 				TRACE("Send Packet Failed\n");
 				continue;
 			}
-			auto pair = m_mapAck.insert(std::pair<HANDLE, std::list<CPacket>>(head.hEvent, std::list<CPacket>())).first;
-			int n_recv = recv(m_socket, pBuf + index, BUF_SIZE - index, 0);
-			if (n_recv > 0 || index > 0)
-			{
-				if (n_recv > 0) index += n_recv;
-				size_t n_parsed = index;
-				CPacket packet((BYTE*)pBuf, n_parsed);
-				if (int(n_parsed) > 0)
+			// TODO it null check
+			auto it = m_mapAck.find(head.hEvent);
+			BOOL autoClose = m_mapAutoClose[head.hEvent];
+			do {
+				int n_recv = recv(m_socket, pBuf + index, BUF_SIZE - index, 0);
+				if (n_recv > 0 || index > 0)
 				{
-					// Set specific event to signaled state, Allows any threads that are waiting on
-					// the event to be release and continue execution, kind like condition variable
-					packet.hEvent = head.hEvent;
-					pair->second.emplace_back(std::move(packet));
-					SetEvent(head.hEvent); // notify other threads waiting on this event being signaled to continue;
-#if 0
-					// potential problems? : unreset index pos. for file or directory info
-					char* unparse_pos = pBuf + n_parsed;
-					int n_unparse = int(index - n_parsed);
-					if (n_unparse >= 0)
+					if (n_recv > 0) index += n_recv;
+					size_t n_parsed = index;
+					CPacket packet((BYTE*)pBuf, n_parsed);
+					if (int(n_parsed) > 0)
 					{
-						memmove(pBuf, unparse_pos, n_unparse);
-						index -= (int)n_parsed;
+						// Set specific event to signaled state, Allows any threads that are waiting on
+						// the event to be release and continue execution, kind like condition variable
+						packet.hEvent = head.hEvent;
+						it->second.emplace_back(std::move(packet));
+						// receive one packet over.
+						if (autoClose) break;
+						// continue receiving
+						char* unparse_pos = pBuf + n_parsed;
+						int n_unparse = int(index - n_parsed);
+						if (n_unparse >= 0)
+						{
+							memmove(pBuf, unparse_pos, n_unparse);
+							index -= (int)n_parsed;
+						}
+						else
+						{
+							TRACE("Recv 0, but still can parse Packet out, has leftover in buffer, index:[%d] < n_parsed:[%d]\n", index, n_parsed);
+						}
 					}
-					else
-					{
-						TRACE("Recv 0, but still can parse Packet out, has leftover in buffer, index:[%d] < n_parsed:[%d]\n", index, n_parsed);
-					}
-#endif
 				}
-			}
-			else {
-				CloseSocket();
-			}
+				else {
+					CloseSocket();
+					break;
+				}
+			} while (!autoClose);
+			InitSocket();
 			m_queueSend.pop();
+			SetEvent(head.hEvent);
 		}
 	}
 	CloseSocket();
@@ -324,16 +334,14 @@ void CClientSocket::UpdateAddress(ULONG nIp, USHORT nPort)
 	m_nPort = nPort;
 }
 
-BOOL CClientSocket::SendPacket(const CPacket& packet, std::list<CPacket> *lstPackets)
+BOOL CClientSocket::SendPacket(const CPacket& packet, std::list<CPacket> *lstAcks, BOOL bAutoClose)
 {
 	if (m_socket == INVALID_SOCKET)
 	{
-		if (!InitSocket())
-		{
-			return FALSE;
-		}
 		_beginthread(&CClientSocket::ThreadEntry, 0, this);
 	}
+	auto pair = m_mapAck.insert(std::pair<HANDLE, std::list<CPacket>>(packet.hEvent, *lstAcks)).first;
+	m_mapAutoClose.insert(std::pair<HANDLE, BOOL>(packet.hEvent, bAutoClose));
 	m_queueSend.push(packet);
 	WaitForSingleObject(packet.hEvent, INFINITE);
 	auto it = m_mapAck.find(packet.hEvent);
@@ -341,7 +349,8 @@ BOOL CClientSocket::SendPacket(const CPacket& packet, std::list<CPacket> *lstPac
 	{
 		for (auto& p : it->second)
 		{
-			lstPackets->push_back(p);
+			// this return to client call for ack.
+			lstAcks->push_back(p);
 		}
 		m_mapAck.erase(it);
 		return TRUE;

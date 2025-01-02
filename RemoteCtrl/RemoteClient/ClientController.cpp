@@ -91,6 +91,7 @@ LRESULT CClientController::SendMsg(MSG msg)
 	// hEvent Setted represent handle message finished.
 	// Wait for hEvent be signaled.
 	WaitForSingleObject(hEvent, INFINITE);
+	CloseHandle(hEvent);
 	return info.result;
 }
 
@@ -110,23 +111,29 @@ void CClientController::CloseSocket()
 }
 
 int CClientController::SendCommandPacket(int nCmd, BYTE* pData, size_t nLength,
-										 std::list<CPacket>* pLstAcks)
+										 std::list<CPacket>* pLstAcks, BOOL bAutoClose)
 {
 	CClientSocket* pClient = CClientSocket::GetInstance();
 	if (!pClient) return FALSE;
 	//if (!pClient->InitSocket()) return FALSE;
 	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if (!hEvent)
+	{
+		TRACE("Create Event failed\n");;
+		return -1;
+	}
 	// TODO: Shouldn't directly send, add packet to queue.
 	std::list<CPacket> lstAcks;
 	if (!pLstAcks)
 	{
 		pLstAcks = &lstAcks;
 	}
-	if (!pClient->SendPacket(CPacket(nCmd, pData, nLength, hEvent), pLstAcks))
+	if (!pClient->SendPacket(CPacket(nCmd, pData, nLength, hEvent), pLstAcks, bAutoClose))
 	{
 		TRACE("Client Send Paccket Failed\r\n");
 		return -1;
 	}
+	CloseHandle(hEvent); // prevent handle leak
 	if (pLstAcks->size())
 	{
 		return pLstAcks->front().sCmd;
@@ -300,10 +307,10 @@ void CClientController::ThreadWatchScreen()
 		if (!m_watchDlg.isImageBufFull())
 		{
 			std::list<CPacket> lstPackets;
-			if (SendCommandPacket(CMD_SEND_SCREEN, NULL, 0, &lstPackets)
+			if (SendCommandPacket(CMD_SEND_SCREEN, NULL, 0, &lstPackets, FALSE)
 				== CMD_SEND_SCREEN)
 			{
-				if (CUtils::Bytes2Image(m_clientDlg->GetImage(), 
+				if (CUtils::Bytes2Image(m_watchDlg.GetImage(),
 							lstPackets.front().strData) == 0)
 				{
 					m_watchDlg.SetIsImageBufFull(TRUE);
