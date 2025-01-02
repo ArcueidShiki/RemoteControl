@@ -100,7 +100,13 @@ void CClientSocket::ThreadFunc()
 						packet.hEvent = head.hEvent;
 						it->second.emplace_back(std::move(packet));
 						// receive one packet over.
-						if (autoClose) break;
+						if (autoClose)
+						{
+							CloseSocket();
+							strBuf.clear();
+							index = 0;
+							break;
+						}
 						// continue receiving
 						char* unparse_pos = pBuf + n_parsed;
 						int n_unparse = int(index - n_parsed);
@@ -117,6 +123,8 @@ void CClientSocket::ThreadFunc()
 				}
 				else {
 					CloseSocket();
+					strBuf.clear();
+					index = 0;
 					break;
 				}
 			} while (!autoClose);
