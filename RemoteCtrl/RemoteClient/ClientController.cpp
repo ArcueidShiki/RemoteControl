@@ -31,6 +31,7 @@ CClientController::CClientController()
 
 int CClientController::InitController()
 {
+	// Create Handle Message Loop Thread with m_tid!
 	m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CClientController::ThreadEntry, this, 0, &m_tid);
 	m_statusDlg.Create(IDD_DLG_STATUS, m_clientDlg);
 	struct {
@@ -62,11 +63,6 @@ void CClientController::ReleaseInstance()
 {
 	if (m_instance)
 	{
-		//if (m_instance->m_hThread != INVALID_HANDLE_VALUE)
-		//{
-		//	PostThreadMessage(m_instance->m_tid, WM_QUIT, 0, 0);
-		//	WaitForSingleObject(m_instance->m_hThread, 100);
-		//}
 		delete m_instance;
 		m_instance = NULL;
 	}
@@ -92,8 +88,10 @@ LRESULT CClientController::SendMsg(MSG msg)
 	if (!hEvent) return -2;
 	// nMsg code(cmd) + result code
 	MSGINFO info(msg);
-	// tid, message code, msginfo, uuid
+	// tid, message code, msginfo(msg code + ret), event
 	PostThreadMessage(m_tid, WM_SEND_MESSAGE, (WPARAM)&info, (LPARAM)hEvent);
+	// hEvent Setted represent handle message finished.
+	// Wait for hEvent be signaled.
 	WaitForSingleObject(hEvent, INFINITE);
 	return info.result;
 }
@@ -127,7 +125,9 @@ int CClientController::SendCommandPacket(int nCmd, BOOL bAutoclose, BYTE* pData,
 	CClientSocket* pClient = CClientSocket::GetInstance();
 	if (!pClient) return FALSE;
 	if (!pClient->InitSocket()) return FALSE;
-	if (!pClient->Send(CPacket(nCmd, pData, nLength)))
+	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	// TODO: Shouldn't directly send, add packet to queue.
+	if (!pClient->Send(CPacket(nCmd, pData, nLength, hEvent)))
 	{
 		TRACE("Client Send Paccket Failed\r\n");
 		return -1;
@@ -194,7 +194,7 @@ void CClientController::StartWatchScreen()
 
 void CClientController::ThreadFunc()
 {
-	MSG msg;
+	MSG msg; // Message Loop
 	while (::GetMessage(&msg, NULL, 0, 0))
 	{
 		TranslateMessage(&msg);
@@ -217,6 +217,7 @@ void CClientController::ThreadFunc()
 			{
 				pMsg->result = -1;
 			}
+			// After Finishing handling message, set event flag as complete.
 			SetEvent(hEvent);
 		}
 		else {

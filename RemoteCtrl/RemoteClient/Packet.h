@@ -21,9 +21,9 @@ public:
 	CPacket();
 	CPacket(const CPacket& other);
 	// parse packet
-	CPacket(const BYTE* pData, size_t& nSize);
+	CPacket(const BYTE* pData, size_t& nSize, HANDLE hEvent = INVALID_HANDLE_VALUE);
 	// construct packet
-	CPacket(WORD nCmd, const BYTE* pData, size_t nSize);
+	CPacket(WORD nCmd, const BYTE* pData, size_t nSize, HANDLE hEvent = INVALID_HANDLE_VALUE);
 	CPacket& operator=(const CPacket& other);
 	~CPacket() {}
 	size_t Size() const;
@@ -34,6 +34,6 @@ public:
 	WORD sCmd; // conctrol command
 	std::string strData;
 	WORD sSum; // check sum / crc
-	//std::string strOut;
+	HANDLE hEvent;
 };
 #pragma pack(pop)

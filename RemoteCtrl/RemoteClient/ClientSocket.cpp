@@ -56,6 +56,69 @@ CClientSocket* CClientSocket::GetInstance()
 	return m_instance;
 }
 
+void CClientSocket::ThreadEntry(void* arg)
+{
+	CClientSocket* self = (CClientSocket*)arg;
+	self->ThreadFunc();
+	_endthread();
+}
+
+void CClientSocket::ThreadFunc()
+{
+	if (!InitSocket()) return;
+	std::string strBuf;
+	strBuf.resize(BUF_SIZE);
+	char* pBuf = const_cast<char *>(strBuf.c_str());
+	int index = 0;
+	while (m_socket != INVALID_SOCKET)
+	{
+		if (m_queueSend.size() > 0)
+		{
+			CPacket& head = m_queueSend.front();
+			if (!Send(head))
+			{
+				TRACE("Send Packet Failed\n");
+				continue;
+			}
+			auto pair = m_mapAck.insert(std::pair<HANDLE, std::list<CPacket>>(head.hEvent, std::list<CPacket>())).first;
+			int n_recv = recv(m_socket, pBuf + index, BUF_SIZE - index, 0);
+			if (n_recv > 0 || index > 0)
+			{
+				if (n_recv > 0) index += n_recv;
+				size_t n_parsed = index;
+				CPacket packet((BYTE*)pBuf, n_parsed);
+				if (int(n_parsed) > 0)
+				{
+					// Set specific event to signaled state, Allows any threads that are waiting on
+					// the event to be release and continue execution, kind like condition variable
+					packet.hEvent = head.hEvent;
+					pair->second.emplace_back(std::move(packet));
+					SetEvent(head.hEvent); // notify other threads waiting on this event being signaled to continue;
+#if 0
+					// potential problems? : unreset index pos. for file or directory info
+					char* unparse_pos = pBuf + n_parsed;
+					int n_unparse = int(index - n_parsed);
+					if (n_unparse >= 0)
+					{
+						memmove(pBuf, unparse_pos, n_unparse);
+						index -= (int)n_parsed;
+					}
+					else
+					{
+						TRACE("Recv 0, but still can parse Packet out, has leftover in buffer, index:[%d] < n_parsed:[%d]\n", index, n_parsed);
+					}
+#endif
+				}
+			}
+			else {
+				CloseSocket();
+			}
+			m_queueSend.pop();
+		}
+	}
+	CloseSocket();
+}
+
 void CClientSocket::ReleaseInstance()
 {
 	if (m_instance != NULL)

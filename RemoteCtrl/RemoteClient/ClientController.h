@@ -62,7 +62,7 @@ private:
 	HANDLE m_hThread;
 	HANDLE m_hThreadDownload;
 	HANDLE m_hThreadWatch;
-	UINT m_tid;
+	UINT m_tid;	// message loop thread id
 	static CHelper m_helper;
 	char *m_localPath;
 	char *m_remotePath;
