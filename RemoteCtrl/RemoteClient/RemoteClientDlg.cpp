@@ -185,12 +185,13 @@ void CRemoteClientDlg::OnBnClickedBtnTest()
 
 void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 {
-	if (CClientController::GetInstance()->SendCommandPacket(CMD_DRIVER) == -1)
+	std::list<CPacket> lstPackets;
+	if (CClientController::GetInstance()->SendCommandPacket(CMD_DRIVER, NULL, 0, &lstPackets) == -1)
 	{
 		AfxMessageBox(_T("Send Command Packet Failed"));
 		return;
 	}
-	std::string drivers = pClient->GetPacket().strData;
+	std::string drivers = lstPackets.front().strData;
 	std::string driver;
 	m_tree.DeleteAllItems();
 	for (size_t i = 0; i < drivers.size(); i++)
@@ -258,7 +259,7 @@ void CRemoteClientDlg::LoadDirectory()
 	const char* path = asciiPath;
 	size_t strLen = strlen(asciiPath);
 	TRACE("strPath: %s Length: %zu\n", path, strLen);
-	int nCmd = CClientController::GetInstance()->SendCommandPacket(CMD_DIR, FALSE, (BYTE*)path, strLen);
+	int nCmd = CClientController::GetInstance()->SendCommandPacket(CMD_DIR, (BYTE*)path, strLen);
 	PFILEINFO pInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
 	int id = 0;
 	while (pInfo->HasNext)
@@ -292,7 +293,7 @@ void CRemoteClientDlg::LoadFiles()
 	const char* path = asciiPath;
 	size_t strLen = strlen(asciiPath);
 	TRACE("strPath: %s Length: %zu\n", path, strLen);
-	int nCmd = CClientController::GetInstance()->SendCommandPacket(CMD_DIR, FALSE, (BYTE*)path, strLen);
+	int nCmd = CClientController::GetInstance()->SendCommandPacket(CMD_DIR, (BYTE*)path, strLen);
 	PFILEINFO pInfo = (PFILEINFO)pClient->GetPacket().strData.c_str();
 	int id = 0;
 	while (pInfo->HasNext)
@@ -373,7 +374,7 @@ void CRemoteClientDlg::OnDeleteFile()
 	char* fullpath = asciiFullPath;
 	// wcstombs_s(&nConverted, fullpath, MAX_PATH, asciiFullPath, MAX_PATH);
 	TRACE("Full File Path : [%s], name len:[%zu]\n", fullpath, strlen(fullpath));
-	int ret = CClientController::GetInstance()->SendCommandPacket(CMD_DEL_FILE, TRUE, (BYTE*)fullpath, strlen(fullpath));
+	int ret = CClientController::GetInstance()->SendCommandPacket(CMD_DEL_FILE, (BYTE*)fullpath, strlen(fullpath));
 	if (ret < 0)
 	{
 		AfxMessageBox(L"Delete File Failed");
@@ -392,7 +393,7 @@ void CRemoteClientDlg::OnOpenFile()
 	CT2A asciiFullPath(dirPath + strFile);
 	char* fullpath = asciiFullPath;
 	TRACE("Full File Path : [%s], name len:[%zu]\n", fullpath, strlen(fullpath));
-	int ret = CClientController::GetInstance()->SendCommandPacket(CMD_RUN_FILE, TRUE, (BYTE*)fullpath, strlen(fullpath));
+	int ret = CClientController::GetInstance()->SendCommandPacket(CMD_RUN_FILE, (BYTE*)fullpath, strlen(fullpath));
 	if (ret < 0)
 	{
 		AfxMessageBox(L"Open File Failed");

@@ -129,7 +129,7 @@ void CWatchDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 	CPoint remote = UserPoint2RemoteScreen(point);
 	// POINT is tagPOINT: the parent of CPoint
 	MOUSEEV event(MOUSE_LEFT, MOUSE_DBCLICK, remote);
-	CClientController::GetInstance()->SendCommandPacket(CMD_MOUSE, TRUE, (BYTE*)&event, sizeof(event));
+	CClientController::GetInstance()->SendCommandPacket(CMD_MOUSE, (BYTE*)&event, sizeof(event));
 	CDialog::OnLButtonDblClk(nFlags, point);
 }
 
@@ -143,7 +143,7 @@ void CWatchDlg::OnLButtonDown(UINT nFlags, CPoint point)
 	CPoint remote = UserPoint2RemoteScreen(point);
 	TRACE("remote: x:%d, y:d\n", remote.x, remote.y);
 	MOUSEEV event(MOUSE_LEFT, MOUSE_DOWN, remote);
-	CClientController::GetInstance()->SendCommandPacket(CMD_MOUSE, TRUE, (BYTE*)&event, sizeof(event));
+	CClientController::GetInstance()->SendCommandPacket(CMD_MOUSE, (BYTE*)&event, sizeof(event));
 	CDialog::OnLButtonDown(nFlags, point);
 }
 
@@ -155,7 +155,7 @@ void CWatchDlg::OnLButtonUp(UINT nFlags, CPoint point)
 	}
 	CPoint remote = UserPoint2RemoteScreen(point);
 	MOUSEEV event(MOUSE_LEFT, MOUSE_UP, remote);
-	CClientController::GetInstance()->SendCommandPacket(CMD_MOUSE, TRUE, (BYTE*)&event, sizeof(event));
+	CClientController::GetInstance()->SendCommandPacket(CMD_MOUSE, (BYTE*)&event, sizeof(event));
 	CDialog::OnLButtonUp(nFlags, point);
 }
 
@@ -167,7 +167,7 @@ void CWatchDlg::OnRButtonDblClk(UINT nFlags, CPoint point)
 	}
 	CPoint remote = UserPoint2RemoteScreen(point);
 	MOUSEEV event(MOUSE_RIGHT, MOUSE_DBCLICK, remote);
-	CClientController::GetInstance()->SendCommandPacket(CMD_MOUSE, TRUE, (BYTE*)&event, sizeof(event));
+	CClientController::GetInstance()->SendCommandPacket(CMD_MOUSE, (BYTE*)&event, sizeof(event));
 	CDialog::OnRButtonDblClk(nFlags, point);
 }
 
@@ -179,7 +179,7 @@ void CWatchDlg::OnRButtonDown(UINT nFlags, CPoint point)
 	}
 	CPoint remote = UserPoint2RemoteScreen(point);
 	MOUSEEV event(MOUSE_RIGHT, MOUSE_DOWN, remote);
-	CClientController::GetInstance()->SendCommandPacket(CMD_MOUSE, TRUE, (BYTE*)&event, sizeof(event));
+	CClientController::GetInstance()->SendCommandPacket(CMD_MOUSE, (BYTE*)&event, sizeof(event));
 	CDialog::OnRButtonDown(nFlags, point);
 }
 
@@ -191,7 +191,7 @@ void CWatchDlg::OnRButtonUp(UINT nFlags, CPoint point)
 	}
 	CPoint remote = UserPoint2RemoteScreen(point);
 	MOUSEEV event(MOUSE_RIGHT, MOUSE_UP, remote);
-	CClientController::GetInstance()->SendCommandPacket(CMD_MOUSE, TRUE, (BYTE*)&event, sizeof(event));
+	CClientController::GetInstance()->SendCommandPacket(CMD_MOUSE, (BYTE*)&event, sizeof(event));
 	CDialog::OnRButtonUp(nFlags, point);
 }
 
@@ -203,7 +203,7 @@ void CWatchDlg::OnMouseMove(UINT nFlags, CPoint point)
 	}
 	CPoint remote = UserPoint2RemoteScreen(point);
 	MOUSEEV event(MOUSE_MOVE, MOUSE_MOVE, remote);
-	CClientController::GetInstance()->SendCommandPacket(CMD_MOUSE, TRUE, (BYTE*)&event, sizeof(event));
+	CClientController::GetInstance()->SendCommandPacket(CMD_MOUSE, (BYTE*)&event, sizeof(event));
 	CDialog::OnMouseMove(nFlags, point);
 }
 
@@ -217,7 +217,7 @@ void CWatchDlg::OnStnClickedWatch()
 	GetCursorPos(&pt);
 	CPoint remote = UserPoint2RemoteScreen(pt, TRUE);
 	MOUSEEV event(MOUSE_LEFT, MOUSE_DOWN, remote);
-	CClientController::GetInstance()->SendCommandPacket(CMD_MOUSE, TRUE, (BYTE*)&event, sizeof(event));
+	CClientController::GetInstance()->SendCommandPacket(CMD_MOUSE, (BYTE*)&event, sizeof(event));
 }
 
 void CWatchDlg::OnOK()

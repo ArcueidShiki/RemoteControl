@@ -65,7 +65,6 @@ void CClientSocket::ThreadEntry(void* arg)
 
 void CClientSocket::ThreadFunc()
 {
-	if (!InitSocket()) return;
 	std::string strBuf;
 	strBuf.resize(BUF_SIZE);
 	char* pBuf = const_cast<char *>(strBuf.c_str());
@@ -323,4 +322,29 @@ void CClientSocket::UpdateAddress(ULONG nIp, USHORT nPort)
 {
 	m_nIp = nIp;
 	m_nPort = nPort;
+}
+
+BOOL CClientSocket::SendPacket(const CPacket& packet, std::list<CPacket> *lstPackets)
+{
+	if (m_socket == INVALID_SOCKET)
+	{
+		if (!InitSocket())
+		{
+			return FALSE;
+		}
+		_beginthread(&CClientSocket::ThreadEntry, 0, this);
+	}
+	m_queueSend.push(packet);
+	WaitForSingleObject(packet.hEvent, INFINITE);
+	auto it = m_mapAck.find(packet.hEvent);
+	if (it != m_mapAck.end())
+	{
+		for (auto& p : it->second)
+		{
+			lstPackets->push_back(p);
+		}
+		m_mapAck.erase(it);
+		return TRUE;
+	}
+	return FALSE;
 }
