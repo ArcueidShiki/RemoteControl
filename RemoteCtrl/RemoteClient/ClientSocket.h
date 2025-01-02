@@ -63,7 +63,7 @@ private:
 	ULONG m_nIp;
 	USHORT m_nPort;
 	BOOL m_isAutoClose;
-	std::map<HANDLE, std::list<CPacket>> m_mapAck;
+	std::map<HANDLE, std::list<CPacket>*> m_mapAck;
 	std::map<HANDLE, BOOL> m_mapAutoClose;
 	std::queue<CPacket> m_queueSend;
 };
