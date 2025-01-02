@@ -217,7 +217,7 @@ int CServerSocket::Run(SOCKET_CALLBACK callback, void* arg, USHORT port)
 				lstPackets.pop_front();
 			}
 		}
-		CloseClient();
+		CloseClient() ;
 	}
 	return 0;
 }

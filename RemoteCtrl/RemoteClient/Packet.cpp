@@ -6,10 +6,11 @@ CPacket::CPacket()
 	, nLength(0)
 	, sCmd(0)
 	, sSum(0)
+	, hEvent(INVALID_HANDLE_VALUE)
 {
 }
 
-CPacket::CPacket(const BYTE* pData, size_t& nSize)
+CPacket::CPacket(const BYTE* pData, size_t& nSize, HANDLE hEvent)
 	: sHead(0)
 	, nLength(0)
 	, sCmd(0)
@@ -72,6 +73,7 @@ CPacket::CPacket(const BYTE* pData, size_t& nSize)
 	i += sizeof(sSum);
 	// parse packet success.
 	nSize = i; // head length data
+
 }
 
 CPacket::CPacket(const CPacket& other)
@@ -81,6 +83,7 @@ CPacket::CPacket(const CPacket& other)
 	sCmd = other.sCmd;
 	strData = other.strData;
 	sSum = other.sSum;
+	hEvent = other.hEvent;
 }
 
 CPacket& CPacket::operator=(const CPacket& other)
@@ -92,11 +95,12 @@ CPacket& CPacket::operator=(const CPacket& other)
 		sCmd = other.sCmd;
 		strData = other.strData;
 		sSum = other.sSum;
+		hEvent = other.hEvent;
 	}
 	return *this;
 }
 
-CPacket::CPacket(WORD nCmd, const BYTE* pData, size_t nSize)
+CPacket::CPacket(WORD nCmd, const BYTE* pData, size_t nSize, HANDLE hEvent)
 {
 	sHead = PACKET_HEAD;
 	nLength = DWORD(nSize + sizeof(sCmd) + sizeof(sSum));
@@ -115,6 +119,7 @@ CPacket::CPacket(WORD nCmd, const BYTE* pData, size_t nSize)
 	{
 		sSum += BYTE(strData[i]);
 	}
+	this->hEvent = hEvent;
 }
 
 size_t CPacket::Size() const

@@ -1,10 +1,14 @@
 #pragma once
 #include <string>
+#include <vector>
+#include <queue>
+#include <list>
+#include <map>
 #include "pch.h"
 #include "framework.h"
 #include "Packet.h"
-#include <vector>
 #include "Mouse.h"
+
 
 typedef struct file_info {
 	file_info()
@@ -25,6 +29,8 @@ class CClientSocket
 public:
 	// static function no this pointer, belongs to class. can access non static member.
 	static CClientSocket* GetInstance();
+	static void ThreadEntry(void *arg);
+	void ThreadFunc();
 	BOOL InitSocket();
 	int DealCommand();
 	BOOL Send(const char* pData, size_t nSize);
@@ -55,4 +61,6 @@ private:
 	std::vector<char> m_buf;
 	ULONG m_nIp;
 	USHORT m_nPort;
+	std::map<HANDLE, std::list<CPacket>> m_mapAck;
+	std::queue<CPacket> m_queueSend;
 };
