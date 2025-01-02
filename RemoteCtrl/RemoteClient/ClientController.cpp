@@ -20,8 +20,8 @@ CClientController::CClientController()
 	: m_statusDlg(m_clientDlg)
 	, m_watchDlg(m_clientDlg)
 {
-	m_localPath = NULL;
-	m_remotePath = NULL;
+	m_localPath = new char[MAX_PATH];
+	m_remotePath = new char[MAX_PATH];
 	m_tid = UINT(-1);
 	m_hThread = INVALID_HANDLE_VALUE;
 	m_hThreadDownload = INVALID_HANDLE_VALUE;
@@ -73,6 +73,16 @@ CClientController::~CClientController()
 	{
 		delete m_clientDlg;
 		m_clientDlg = NULL;
+	}
+	if (m_localPath)
+	{
+		delete[] m_localPath;
+		m_localPath = NULL;
+	}
+	if (m_remotePath)
+	{
+		delete[] m_remotePath;
+		m_remotePath = NULL;
 	}
 }
 
@@ -157,13 +167,18 @@ int CClientController::DownloadFile(CString strPath)
 					NULL, m_clientDlg);
 	if (fileDlg.DoModal() == IDOK)
 	{
-		CT2A DPath(fileDlg.GetPathName());
-		m_localPath = DPath;
+		memset(m_localPath, 0, MAX_PATH);
+		memset(m_remotePath, 0, MAX_PATH);
 
-		CW2A asciiFullPath(strPath);
-		m_remotePath = asciiFullPath;
+		CT2A LPath(fileDlg.GetPathName());
+		char* ascciiLocal = LPath;
+		memcpy(m_localPath, ascciiLocal, strlen(ascciiLocal) + 1);
+
+		CW2A RPath(strPath);
+		char* asciiRemote = RPath;
+		memcpy(m_remotePath, asciiRemote, strlen(asciiRemote) + 1);
 		size_t len = strlen(m_remotePath);
-
+		TRACE("Remote Path:[%s], Local Path:[%s] len:[%d]\n", m_remotePath, m_localPath, strlen(m_remotePath));
 		// std::thread(&CClientController::ThreadDownloadFile, this).detach();
 		m_hThreadDownload = (HANDLE)_beginthread(&CClientController::ThreadDownloadEntry, 0, this);
 		// why? just wait for it created?
@@ -171,11 +186,6 @@ int CClientController::DownloadFile(CString strPath)
 		{
 			return -1;
 		}
-		m_clientDlg->BeginWaitCursor();
-		m_statusDlg.m_info.SetWindowText(L"Downloading...");
-		m_statusDlg.ShowWindow(SW_SHOW); // active window accept keyboard input
-		m_statusDlg.CenterWindow(m_clientDlg);
-		m_statusDlg.SetActiveWindow();
 	}
 	return 0;
 }
@@ -233,6 +243,7 @@ void CClientController::ThreadDownloadFile()
 {
 	FILE* pFile;
 	int err = fopen_s(&pFile, m_localPath, "wb+");
+	TRACE("Remote Path:[%s], Local Path:[%s] len:[%d]\n", m_remotePath, m_localPath, strlen(m_remotePath));
 	if (err != 0 || pFile == NULL)
 	{
 		AfxMessageBox(L"Open Dlg File Failed\n");
@@ -242,8 +253,9 @@ void CClientController::ThreadDownloadFile()
 		return;
 	}
 	// send request
-	int ret = SendCommandPacket(CMD_DLD_FILE, (BYTE*)m_remotePath, strlen(m_remotePath));
-	if (ret < 0)
+	std::list<CPacket> lstAcks;
+	int ret = SendCommandPacket(CMD_DLD_FILE, (BYTE*)m_remotePath, strlen(m_remotePath), &lstAcks, FALSE);
+	if (ret < 0 || lstAcks.empty())
 	{
 		AfxMessageBox(L"Donwload File Failed");
 		TRACE("Download File Failed ret = %d\n", ret);
@@ -252,7 +264,7 @@ void CClientController::ThreadDownloadFile()
 		return;
 	}
 	// receive file length
-	auto nLength = *(long long*)CClientSocket::GetInstance()->GetPacket().strData.c_str();
+	auto nLength = *(long long*)lstAcks.front().strData.c_str();
 	if (nLength == 0)
 	{
 		AfxMessageBox(L"File size is Zero or Download File Failed");
@@ -261,26 +273,33 @@ void CClientController::ThreadDownloadFile()
 		m_clientDlg->EndWaitCursor();
 		return;
 	}
-	TRACE("Client Filename:[%s], size:[%lld]\n", m_remotePath, nLength);
+	TRACE("Client Filename:[%s], size:[%lld]\n", m_localPath, nLength);
 	long long nCount = 0;
+	m_clientDlg->BeginWaitCursor();
+	m_statusDlg.m_info.SetWindowText(L"Downloading...");
+	m_statusDlg.ShowWindow(SW_SHOW); // active window accept keyboard input
+	m_statusDlg.CenterWindow(m_clientDlg);
+	m_statusDlg.SetActiveWindow();
 	while (nCount < nLength)
 	{
-		ret = CClientController::GetInstance()->DealCommand();
-		if (ret < 0)
-		{
-			AfxMessageBox(L"Transmission Failed\n");
-			TRACE("Download File Failed, Deal Command Failed ret = %d\n", ret);
-			m_statusDlg.ShowWindow(SW_HIDE);
-			m_clientDlg->EndWaitCursor();
-			break;
-		}
-		std::string data = CClientSocket::GetInstance()->GetPacket().strData;
+		/*ret = CClientController::GetInstance()->DealCommand();*/
+		//if (ret < 0)
+		//{
+		//	AfxMessageBox(L"Transmission Failed\n");
+		//	TRACE("Download File Failed, Deal Command Failed ret = %d\n", ret);
+		//	m_statusDlg.ShowWindow(SW_HIDE);
+		//	m_clientDlg->EndWaitCursor();
+		//	break;
+		//}
+		lstAcks.pop_front();
+		std::string data = lstAcks.front().strData;
 		nCount += data.size();
 		fwrite(data.c_str(), 1, data.size(), pFile);
 	}
 	fclose(pFile);
 	m_statusDlg.ShowWindow(SW_HIDE);
 	m_clientDlg->EndWaitCursor();
+
 	CClientController::GetInstance()->CloseSocket();
 }
 
