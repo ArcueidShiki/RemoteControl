@@ -3,7 +3,6 @@
 #include "WatchDlg.h"
 #include "StatusDlg.h"
 #include "RemoteClientDlg.h"
-#include "Resource.h"
 #include <map>
 
 #define WM_SEND_PACKET (WM_USER + 1)
@@ -57,8 +56,8 @@ private:
 	typedef LRESULT(CClientController::* MSGFUNC)(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	static CClientController* m_instance;
 	static std::map<UINT, MSGFUNC> m_mapFunc;
+	CRemoteClientDlg *m_clientDlg;
 	CWatchDlg m_watchDlg;
-	CRemoteClientDlg m_clientDlg;
 	CStatusDlg m_statusDlg;
 	HANDLE m_hThread;
 	HANDLE m_hThreadDownload;

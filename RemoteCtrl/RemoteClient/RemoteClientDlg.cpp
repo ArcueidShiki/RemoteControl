@@ -56,8 +56,6 @@ CRemoteClientDlg::CRemoteClientDlg(CWnd* pParent /*=nullptr*/)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	pClient = CClientSocket::GetInstance();
-	m_isImageBufFull = FALSE;
-	m_isClosed = FALSE;
 }
 
 void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
@@ -82,28 +80,14 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_COMMAND(ID_DOWNLOAD_FILE, &CRemoteClientDlg::OnDownloadFile)
 	ON_COMMAND(ID_DELETE_FILE, &CRemoteClientDlg::OnDeleteFile)
 	ON_COMMAND(ID_OPEN_FILE, &CRemoteClientDlg::OnOpenFile)
-	ON_MESSAGE(WM_SEND_PACKET, &CRemoteClientDlg::OnSendPacket)
 	ON_BN_CLICKED(IDC_BTN_START_WATCH, &CRemoteClientDlg::OnBnClickedBtnStartWatch)
 	ON_NOTIFY(IPN_FIELDCHANGED, IDC_IPADDRESS_SERV, &CRemoteClientDlg::OnIpnFieldchangedIpaddressServ)
 	ON_EN_CHANGE(IDC_EDIT_PORT, &CRemoteClientDlg::OnEnChangeEditPort)
 END_MESSAGE_MAP()
 
-
-// CRemoteClientDlg message handlers
-
-BOOL CRemoteClientDlg::isImageBufFull() const
-{
-	return m_isImageBufFull;
-}
-
 CImage& CRemoteClientDlg::GetImage()
 {
 	return m_img;
-}
-
-void CRemoteClientDlg::SetIsImageBufFull(BOOL isFull)
-{
-	m_isImageBufFull = isFull;
 }
 
 BOOL CRemoteClientDlg::OnInitDialog()
@@ -136,8 +120,8 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
 	UpdateData();
-	m_port = _T("10000");
-	m_server_address = 0xC0A8027B; // 192.169.2.123, If using virtual box, set network mode to bridge.
+	m_port = _T("20000");
+	m_server_address = 0x7F000001; // 192.169.2.123:0xC0A8027B, If using virtual box, set network mode to bridge.
 	UpdateData(FALSE);
 	CClientController::GetInstance()->UpdateAddress(m_server_address, static_cast<USHORT>(atoi(CW2A(m_port))));
 	m_dlgStatus.Create(IDD_DLG_STATUS, this);
@@ -414,37 +398,6 @@ void CRemoteClientDlg::OnOpenFile()
 		AfxMessageBox(L"Open File Failed");
 		TRACE("Open File Failed, ret = %d\n", ret);
 	}
-}
-
-LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)
-{
-	int ret = 0;
-	int cmd = int(wParam >> 1);
-	BOOL autoclose = wParam & 1;
-	switch (cmd)
-	{
-	case CMD_DLD_FILE:
-	{
-		LPCSTR filepath = (LPCSTR)lParam;
-		ret = CClientController::GetInstance()->SendCommandPacket(cmd, autoclose, (BYTE*)lParam, strlen(filepath));
-		break;
-	}
-	case CMD_MOUSE:
-	{
-		ret = CClientController::GetInstance()->SendCommandPacket(cmd, autoclose, (BYTE*)lParam, sizeof(MOUSEEV));
-		break;
-	}
-	case CMD_SEND_SCREEN:
-	case CMD_LOCK_MACHINE:
-	case CMD_UNLOCK_MACHINE:
-	{
-		ret = CClientController::GetInstance()->SendCommandPacket(cmd, autoclose);
-		break;
-	}
-	default:
-		ret = -1;
-	}
-	return ret;
 }
 
 void CRemoteClientDlg::OnBnClickedBtnStartWatch()

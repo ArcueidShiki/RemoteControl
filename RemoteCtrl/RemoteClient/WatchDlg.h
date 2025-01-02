@@ -1,6 +1,5 @@
 #pragma once
 #include "afxdialogex.h"
-
 // CWatchDlg dialog
 
 class CWatchDlg : public CDialog
@@ -9,6 +8,7 @@ class CWatchDlg : public CDialog
 
 public:
 	CWatchDlg(CWnd* pParent = nullptr);   // standard constructor
+	CWatchDlg& operator=(const CWatchDlg& other);
 	virtual ~CWatchDlg();
 
 // Dialog Data
@@ -30,6 +30,8 @@ public:
 	afx_msg void OnStnClickedWatch();
 	afx_msg void OnBnClickedBtnUnlock();
 	afx_msg void OnBnClickedBtnLock();
+	BOOL isImageBufFull() const;
+	void SetIsImageBufFull(BOOL isFull = TRUE);
 	void OnOK();
 	CStatic m_picture;
 
@@ -40,4 +42,5 @@ protected:
 private:
 	int m_nRemoteWidth;
 	int m_nRemoteHeight;
+	BOOL m_isImageBufFull;
 };

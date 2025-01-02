@@ -22,7 +22,7 @@ int CUtils::Bytes2Image(CImage& img, const std::string& strBuf)
 	HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
 	if (hMem == NULL)
 	{
-		TRACE("Insufficient Memory GlobalAlloc failed\n");
+		//TRACE("Insufficient Memory GlobalAlloc failed\n");
 		Sleep(1);
 		return -1;
 	}

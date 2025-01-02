@@ -133,7 +133,10 @@ BOOL CClientSocket::InitSocket()
 	if (connect(m_socket, (SOCKADDR*)&serv_addr, sizeof(serv_addr)) == SOCKET_ERROR)
 	{
 		AfxMessageBox(_T("Connect Failed"));
-		TRACE("Connect Failed %d %s\n", WSAGetLastError(), GetErrorInfo(WSAGetLastError()).c_str());
+		TRACE("Connect Failed %d %s, ip:[%0X], port:[%d]\n",
+				WSAGetLastError(),
+				GetErrorInfo(WSAGetLastError()).c_str(),
+				m_nIp, m_nPort);
 		return FALSE;
 	}
 	return m_socket != INVALID_SOCKET;
@@ -153,6 +156,7 @@ int CClientSocket::DealCommand()
 	// 3~4 byte: package length
 	// 5~n-2 byte: package data
 	// n-1~n byte: package check: md5checksum, crc16, crc32
+	// multithreads need to lock the buffer
 	char* buf = m_buf.data();
 	if (!buf)
 	{
@@ -166,7 +170,7 @@ int CClientSocket::DealCommand()
 		char* start = buf + index;
 		int buf_available = BUF_SIZE - index;
 		int n_recv = recv(m_socket, start, buf_available, 0);
-		if (n_recv <= 0 && index == 0)
+		if (n_recv <= 0 && index <= 0)
 		{
 			// not receiving and used over.
 			return -1;
@@ -186,9 +190,16 @@ int CClientSocket::DealCommand()
 			// overwrite the used len bytes buffer area
 			char* unparse_pos = buf + n_parsed;
 			int n_unparse = int(index - n_parsed);
-			memmove(buf, unparse_pos, n_unparse);
-			// after moving, the unused spacec for receiving data
-			index -= (int)n_parsed;
+			if (n_unparse >= 0)
+			{
+				memmove(buf, unparse_pos, n_unparse);
+				// after moving, the unused spacec for receiving data
+				index -= (int)n_parsed;
+			}
+			else
+			{
+				TRACE("Recv 0, but still can parse Packet out, has leftover in buffer, index:[%d] < n_parsed:[%d]\n", index, n_parsed);
+			}
 			return m_packet.sCmd;
 		}
 	}
