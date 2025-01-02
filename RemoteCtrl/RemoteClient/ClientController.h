@@ -5,8 +5,6 @@
 #include "RemoteClientDlg.h"
 #include <map>
 
-#define WM_SEND_PACKET (WM_USER + 1)
-#define WM_SEND_DATA (WM_USER + 2)
 #define WM_SEND_STATUS (WM_USER + 3)
 #define WM_SEND_WATCH (WM_USER + 4)
 #define WM_SEND_MESSAGE (WM_USER + 0x1000)
@@ -21,8 +19,8 @@ public:
 	void UpdateAddress(ULONG nIp, USHORT nPort);
 	int DealCommand();
 	void CloseSocket();
-	BOOL SendPacket(const CPacket& packet);
-	int SendCommandPacket(int nCmd, BOOL bAutoclose = TRUE, BYTE* pData = NULL, size_t nLength = 0);
+	int SendCommandPacket(int nCmd, BYTE* pData = NULL, size_t nLength = 0,
+						  std::list<CPacket> *pLstAcks = NULL);
 	int GetImage(CImage& img);
 	int DownloadFile(CString strPath);
 	void StartWatchScreen();
@@ -36,8 +34,6 @@ protected:
 	static UINT __stdcall ThreadEntry(void* arg);
 	void ThreadWatchScreen();
 	static void __stdcall ThreadWatchScreenEntry(void* arg);
-	LRESULT OnSendPacket(UINT nMsg, WPARAM wParam, LPARAM lParam);
-	LRESULT OnSendData(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	LRESULT OnShowtatus(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	LRESULT OnShowWatch(UINT nMsg, WPARAM wParam, LPARAM lParam);
 private:

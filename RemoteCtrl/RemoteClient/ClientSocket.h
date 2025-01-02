@@ -33,13 +33,12 @@ public:
 	void ThreadFunc();
 	BOOL InitSocket();
 	int DealCommand();
-	BOOL Send(const char* pData, size_t nSize);
-	BOOL Send(const CPacket& packet);
 	BOOL GetFilePath(std::string& strPath);
 	BOOL GetMouseEvent(MOUSEEV& mouse);
 	void CloseSocket();
 	CPacket& GetPacket() { return m_packet; }
 	void UpdateAddress(ULONG nIp, USHORT nPort);
+	BOOL SendPacket(const CPacket &packet, std::list<CPacket> *lstPackets);
 private:
 	// Initialize before main
 	// Singleton, private all constructors
@@ -48,6 +47,8 @@ private:
 	CClientSocket();
 	~CClientSocket();
 	BOOL InitSocketEnv();
+	BOOL Send(const char* pData, size_t nSize);
+	BOOL Send(const CPacket& packet);
 	static void ReleaseInstance();
 	class CHelper {
 	public:

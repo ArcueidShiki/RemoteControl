@@ -38,8 +38,6 @@ int CClientController::InitController()
 		UINT nMsg;
 		MSGFUNC func;
 	} MsgFuncs[] = {
-		{WM_SEND_PACKET, &CClientController::OnSendPacket},
-		{WM_SEND_DATA, &CClientController::OnSendData},
 		{WM_SEND_STATUS, &CClientController::OnShowtatus},
 		{WM_SEND_WATCH, &CClientController::OnShowWatch},
 		{WM_SEND_MESSAGE, NULL/*TODO*/},
@@ -111,36 +109,29 @@ void CClientController::CloseSocket()
 	CClientSocket::GetInstance()->CloseSocket();
 }
 
-BOOL CClientController::SendPacket(const CPacket& packet)
+int CClientController::SendCommandPacket(int nCmd, BYTE* pData, size_t nLength,
+										 std::list<CPacket>* pLstAcks)
 {
 	CClientSocket* pClient = CClientSocket::GetInstance();
 	if (!pClient) return FALSE;
-	if (!pClient->InitSocket()) return FALSE;
-	pClient->Send(packet);
-	return 0;
-}
-
-int CClientController::SendCommandPacket(int nCmd, BOOL bAutoclose, BYTE* pData, size_t nLength)
-{
-	CClientSocket* pClient = CClientSocket::GetInstance();
-	if (!pClient) return FALSE;
-	if (!pClient->InitSocket()) return FALSE;
+	//if (!pClient->InitSocket()) return FALSE;
 	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 	// TODO: Shouldn't directly send, add packet to queue.
-	if (!pClient->Send(CPacket(nCmd, pData, nLength, hEvent)))
+	std::list<CPacket> lstAcks;
+	if (!pLstAcks)
+	{
+		pLstAcks = &lstAcks;
+	}
+	if (!pClient->SendPacket(CPacket(nCmd, pData, nLength, hEvent), pLstAcks))
 	{
 		TRACE("Client Send Paccket Failed\r\n");
 		return -1;
 	}
-	// get return msg from server
-	int rCmd = DealCommand();
-	if (rCmd != nCmd)
+	if (pLstAcks->size())
 	{
-		TRACE("Get Return msg from server failed: rCmd: [%d]\r\n", rCmd);
-		return -1;
+		return pLstAcks->front().sCmd;
 	}
-	if (bAutoclose) CloseSocket();
-	return rCmd;
+	return -1;
 }
 
 /**
@@ -244,7 +235,7 @@ void CClientController::ThreadDownloadFile()
 		return;
 	}
 	// send request
-	int ret = SendCommandPacket(CMD_DLD_FILE, FALSE, (BYTE*)m_remotePath, strlen(m_remotePath));
+	int ret = SendCommandPacket(CMD_DLD_FILE, (BYTE*)m_remotePath, strlen(m_remotePath));
 	if (ret < 0)
 	{
 		AfxMessageBox(L"Donwload File Failed");
@@ -308,10 +299,12 @@ void CClientController::ThreadWatchScreen()
 	{
 		if (!m_watchDlg.isImageBufFull())
 		{
-			if (SendCommandPacket(CMD_SEND_SCREEN, FALSE, NULL, 0)
+			std::list<CPacket> lstPackets;
+			if (SendCommandPacket(CMD_SEND_SCREEN, NULL, 0, &lstPackets)
 				== CMD_SEND_SCREEN)
 			{
-				if (GetImage(m_clientDlg->GetImage()) == 0)
+				if (CUtils::Bytes2Image(m_clientDlg->GetImage(), 
+							lstPackets.front().strData) == 0)
 				{
 					m_watchDlg.SetIsImageBufFull(TRUE);
 				}
@@ -333,18 +326,6 @@ void __stdcall CClientController::ThreadWatchScreenEntry(void* arg)
 	CClientController* self = (CClientController*)arg;
 	self->ThreadWatchScreen();
 	_endthread();
-}
-
-LRESULT CClientController::OnSendPacket(UINT nMsg, WPARAM wParam, LPARAM lParam)
-{
-	CPacket* packet = (CPacket*)wParam;
-	return CClientSocket::GetInstance()->Send(*packet);
-}
-
-LRESULT CClientController::OnSendData(UINT nMsg, WPARAM wParam, LPARAM lParam)
-{
-	char *pBuf = (char*)wParam;
-	return CClientSocket::GetInstance()->Send(pBuf, (size_t)lParam);
 }
 
 LRESULT CClientController::OnShowtatus(UINT nMsg, WPARAM wParam, LPARAM lParam)
