@@ -231,12 +231,13 @@ void CRemoteClientDlg::DeleteTreeChildrenItem(HTREEITEM hTree)
 	} while (hSub);
 }
 
+// has some problems when on click and the dir name
 void CRemoteClientDlg::LoadDirectory()
 {
 	CPoint ptMouse;
 	GetCursorPos(&ptMouse); // global point to screen
 	m_tree.ScreenToClient(&ptMouse); // screen to client
-	HTREEITEM hTreeSelected = m_tree.HitTest(ptMouse, 0);
+	HTREEITEM hTreeSelected = m_tree.HitTest(ptMouse, 0); // this translateion may make point negative
 	if (hTreeSelected == NULL)
 	{
 		TRACE("No Item Selected\n");

@@ -294,6 +294,7 @@ void CCommand::RunCommand(void* obj, int nCmd, std::list<CPacket> &lstPackets, C
         int ret = self->ExecuteCommand(nCmd, lstPackets, inPacket);
         if (ret != 0)
         {
+            // failed when download file.
             TRACE("Execute Command failed: cmd = %d, ret = %d\n", nCmd, ret);
         }
     }
