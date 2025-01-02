@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "ClientController.h"
 #include "Utils.h"
+#include "Resource.h"
 
 std::map<UINT, CClientController::MSGFUNC> CClientController::m_mapFunc;
 CClientController* CClientController::m_instance = NULL;
@@ -12,20 +13,73 @@ CClientController* CClientController::GetInstance()
 	{
 		m_instance = new CClientController();
 	}
-	return nullptr;
+	return m_instance;
+}
+
+CClientController::CClientController()
+	: m_statusDlg(m_clientDlg)
+	, m_watchDlg(m_clientDlg)
+{
+	m_localPath = NULL;
+	m_remotePath = NULL;
+	m_tid = UINT(-1);
+	m_hThread = INVALID_HANDLE_VALUE;
+	m_hThreadDownload = INVALID_HANDLE_VALUE;
+	m_hThreadWatch = INVALID_HANDLE_VALUE;
+	m_isWatchDlgClosed = TRUE;
 }
 
 int CClientController::InitController()
 {
 	m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CClientController::ThreadEntry, this, 0, &m_tid);
-	m_statusDlg.Create(IDD_DLG_STATUS, &m_clientDlg);
+	m_statusDlg.Create(IDD_DLG_STATUS, m_clientDlg);
+	struct {
+		UINT nMsg;
+		MSGFUNC func;
+	} MsgFuncs[] = {
+		{WM_SEND_PACKET, &CClientController::OnSendPacket},
+		{WM_SEND_DATA, &CClientController::OnSendData},
+		{WM_SEND_STATUS, &CClientController::OnShowtatus},
+		{WM_SEND_WATCH, &CClientController::OnShowWatch},
+		{WM_SEND_MESSAGE, NULL/*TODO*/},
+		{UINT(-1), NULL}
+	};
+	for (int i = 0; MsgFuncs[i].nMsg != -1; i++)
+	{
+		m_mapFunc.insert(std::pair<UINT, MSGFUNC>(MsgFuncs[i].nMsg, MsgFuncs[i].func));
+	}
 	return 0;
 }
 
 int CClientController::Invoke(CWnd** pMainWnd)
 {
-	*pMainWnd = &m_clientDlg;
-	return (int)m_clientDlg.DoModal();
+	m_clientDlg = new CRemoteClientDlg();
+	*pMainWnd = m_clientDlg;
+	return (int)m_clientDlg->DoModal();
+}
+
+void CClientController::ReleaseInstance()
+{
+	if (m_instance)
+	{
+		//if (m_instance->m_hThread != INVALID_HANDLE_VALUE)
+		//{
+		//	PostThreadMessage(m_instance->m_tid, WM_QUIT, 0, 0);
+		//	WaitForSingleObject(m_instance->m_hThread, 100);
+		//}
+		delete m_instance;
+		m_instance = NULL;
+	}
+}
+
+CClientController::~CClientController()
+{
+	WaitForSingleObject(m_hThread, 100);
+	if (m_clientDlg)
+	{
+		delete m_clientDlg;
+		m_clientDlg = NULL;
+	}
 }
 
 /**
@@ -46,6 +100,7 @@ LRESULT CClientController::SendMsg(MSG msg)
 
 void CClientController::UpdateAddress(ULONG nIp, USHORT nPort)
 {
+	CClientSocket::GetInstance()->UpdateAddress(nIp, nPort);
 }
 
 int CClientController::DealCommand()
@@ -78,14 +133,14 @@ int CClientController::SendCommandPacket(int nCmd, BOOL bAutoclose, BYTE* pData,
 		return -1;
 	}
 	// get return msg from server
-	int cmd = DealCommand();
-	if (cmd == -1)
+	int rCmd = DealCommand();
+	if (rCmd != nCmd)
 	{
-		TRACE("Get Return msg from server failed\r\n");
+		TRACE("Get Return msg from server failed: rCmd: [%d]\r\n", rCmd);
 		return -1;
 	}
 	if (bAutoclose) CloseSocket();
-	return cmd;
+	return rCmd;
 }
 
 /**
@@ -99,12 +154,12 @@ int CClientController::GetImage(CImage& img)
 int CClientController::DownloadFile(CString strPath)
 {
 	// False for Save sa, "extension", "filename", flags, filter, parent
-	CFileDialog dlg(FALSE, L"*", strPath,
+	CFileDialog fileDlg(FALSE, L"*", strPath,
 					OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
-					NULL, &m_clientDlg);
-	if (dlg.DoModal() == IDOK)
+					NULL, m_clientDlg);
+	if (fileDlg.DoModal() == IDOK)
 	{
-		CT2A DPath(dlg.GetPathName());
+		CT2A DPath(fileDlg.GetPathName());
 		m_localPath = DPath;
 
 		CW2A asciiFullPath(strPath);
@@ -118,10 +173,10 @@ int CClientController::DownloadFile(CString strPath)
 		{
 			return -1;
 		}
-		m_clientDlg.BeginWaitCursor();
+		m_clientDlg->BeginWaitCursor();
 		m_statusDlg.m_info.SetWindowText(L"Downloading...");
 		m_statusDlg.ShowWindow(SW_SHOW); // active window accept keyboard input
-		m_statusDlg.CenterWindow(&m_clientDlg);
+		m_statusDlg.CenterWindow(m_clientDlg);
 		m_statusDlg.SetActiveWindow();
 	}
 	return 0;
@@ -130,53 +185,11 @@ int CClientController::DownloadFile(CString strPath)
 void CClientController::StartWatchScreen()
 {
 	m_isWatchDlgClosed = FALSE;
-	CWatchDlg dlg(&m_clientDlg);
+	m_watchDlg = CWatchDlg(m_clientDlg);
 	m_hThreadWatch = (HANDLE)_beginthread(&CClientController::ThreadWatchScreenEntry, 0, this);
-	dlg.DoModal();
+	m_watchDlg.DoModal();
 	m_isWatchDlgClosed = TRUE;
 	WaitForSingleObject(m_hThreadWatch, 500);
-}
-
-void CClientController::ReleaseInstance()
-{
-	if (m_instance)
-	{
-		delete m_instance;
-		m_instance = NULL;
-	}
-}
-
-CClientController::CClientController()
-	: m_statusDlg(&m_statusDlg)
-	, m_clientDlg(&m_clientDlg)
-	, m_localPath(NULL)
-	, m_remotePath(NULL)
-	, m_tid(-1)
-	, m_hThread(INVALID_HANDLE_VALUE)
-	, m_hThreadDownload(INVALID_HANDLE_VALUE)
-	, m_hThreadWatch(INVALID_HANDLE_VALUE)
-	, m_isWatchDlgClosed(TRUE)
-{
-	struct {
-		UINT nMsg;
-		MSGFUNC func;
-	} MsgFuncs[] = {
-		{WM_SEND_PACKET, &CClientController::OnSendPacket},
-		{WM_SEND_DATA, &CClientController::OnSendData},
-		{WM_SEND_STATUS, &CClientController::OnShowtatus},
-		{WM_SEND_WATCH, &CClientController::OnShowWatch},
-		{WM_SEND_MESSAGE, NULL/*TODO*/},
-		{UINT(-1), NULL}
-	};
-	for (int i = 0; MsgFuncs[i].nMsg != -1; i++)
-	{
-		m_mapFunc.insert(std::pair<UINT, MSGFUNC>(MsgFuncs[i].nMsg, MsgFuncs[i].func));
-	}
-}
-
-CClientController::~CClientController()
-{
-	WaitForSingleObject(m_hThread, 100);
 }
 
 void CClientController::ThreadFunc()
@@ -226,7 +239,7 @@ void CClientController::ThreadDownloadFile()
 		AfxMessageBox(L"Open Dlg File Failed\n");
 		TRACE("Open Download Path : [%s] Failed\n", m_localPath);
 		m_statusDlg.ShowWindow(SW_HIDE);
-		m_clientDlg.EndWaitCursor();
+		m_clientDlg->EndWaitCursor();
 		return;
 	}
 	// send request
@@ -236,7 +249,7 @@ void CClientController::ThreadDownloadFile()
 		AfxMessageBox(L"Donwload File Failed");
 		TRACE("Download File Failed ret = %d\n", ret);
 		m_statusDlg.ShowWindow(SW_HIDE);
-		m_clientDlg.EndWaitCursor();
+		m_clientDlg->EndWaitCursor();
 		return;
 	}
 	// receive file length
@@ -246,7 +259,7 @@ void CClientController::ThreadDownloadFile()
 		AfxMessageBox(L"File size is Zero or Download File Failed");
 		TRACE("Download File Failed, File Size = 0\n");
 		m_statusDlg.ShowWindow(SW_HIDE);
-		m_clientDlg.EndWaitCursor();
+		m_clientDlg->EndWaitCursor();
 		return;
 	}
 	TRACE("Client Filename:[%s], size:[%lld]\n", m_remotePath, nLength);
@@ -259,7 +272,7 @@ void CClientController::ThreadDownloadFile()
 			AfxMessageBox(L"Transmission Failed\n");
 			TRACE("Download File Failed, Deal Command Failed ret = %d\n", ret);
 			m_statusDlg.ShowWindow(SW_HIDE);
-			m_clientDlg.EndWaitCursor();
+			m_clientDlg->EndWaitCursor();
 			break;
 		}
 		std::string data = CClientSocket::GetInstance()->GetPacket().strData;
@@ -267,9 +280,8 @@ void CClientController::ThreadDownloadFile()
 		fwrite(data.c_str(), 1, data.size(), pFile);
 	}
 	fclose(pFile);
-	m_clientDlg.MessageBox(_T("Download File Success"), _T("Download Success"));
 	m_statusDlg.ShowWindow(SW_HIDE);
-	m_clientDlg.EndWaitCursor();
+	m_clientDlg->EndWaitCursor();
 	CClientController::GetInstance()->CloseSocket();
 }
 
@@ -293,14 +305,14 @@ void CClientController::ThreadWatchScreen()
 	Sleep(50);
 	while (!m_isWatchDlgClosed)
 	{
-		if (!m_clientDlg.isImageBufFull())
+		if (!m_watchDlg.isImageBufFull())
 		{
 			if (SendCommandPacket(CMD_SEND_SCREEN, FALSE, NULL, 0)
 				== CMD_SEND_SCREEN)
 			{
-				if (GetImage(m_clientDlg.GetImage()) == 0)
+				if (GetImage(m_clientDlg->GetImage()) == 0)
 				{
-					m_clientDlg.SetIsImageBufFull(TRUE);
+					m_watchDlg.SetIsImageBufFull(TRUE);
 				}
 				else
 				{

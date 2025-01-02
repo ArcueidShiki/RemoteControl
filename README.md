@@ -8,6 +8,5 @@
 6. if directly using git rebase origin/main, you cannot create a pull request, it will automatically rebase to the remtoe reposiotry.
 7. origin/main is the "local" ref to "remote" origin main. git pull origin/main will upadte from local branch named "origin/main"; git pull origin main, will fetch first, to ensure local origin/main updated.
 
-# TODO 
-1. Should be tested on vmware window >= 10
-2. network communication should be decoupled with dlg UI.
+# TODO
+Solve Concurrent Issues.
