@@ -60,13 +60,15 @@ END_MESSAGE_MAP()
 CPoint CWatchDlg::UserPoint2RemoteScreen(CPoint& pt, BOOL isScreen/* = FALSE*/)
 {
 	CRect clientRect;
-	if (isScreen) ScreenToClient(&pt);
-	TRACE("%s x:%d, y:d\n", __FUNCTION__, pt.x, pt.y);
+	if (!isScreen) 
+	{
+		ClientToScreen(&pt);
+	}
+	m_picture.ScreenToClient(&pt);
 	m_picture.GetWindowRect(&clientRect);
 	// local coordinate to remote screen coordinate
 	int x = pt.x * m_nRemoteWidth / clientRect.Width();
 	int y = pt.y * m_nRemoteHeight / clientRect.Height();
-	TRACE("%s 2 x:%d, y:d\n", __FUNCTION__,x, y);
 	return CPoint(x, y);
 }
 
@@ -129,9 +131,7 @@ void CWatchDlg::OnLButtonDown(UINT nFlags, CPoint point)
 	{
 		return;
 	}
-	TRACE("x:%d, y:d\n", point.x, point.y);
 	CPoint remote = UserPoint2RemoteScreen(point);
-	TRACE("remote: x:%d, y:d\n", remote.x, remote.y);
 	MOUSEEV event(MOUSE_LEFT, MOUSE_DOWN, remote);
 	CClientController::GetInstance()->SendCommandPacket(CMD_MOUSE, (BYTE*)&event, sizeof(event));
 	CDialog::OnLButtonDown(nFlags, point);
@@ -219,7 +219,6 @@ void CWatchDlg::OnOK()
 void CWatchDlg::OnBnClickedBtnUnlock()
 {
 	CClientController::GetInstance()->SendCommandPacket(CMD_UNLOCK_MACHINE);
-
 }
 
 

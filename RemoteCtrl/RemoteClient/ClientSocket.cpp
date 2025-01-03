@@ -13,6 +13,7 @@ CClientSocket::CClientSocket()
 	, m_nIp(INADDR_ANY)
 	, m_nPort(0)
 	, m_isAutoClose(TRUE)
+	, m_hThread(INVALID_HANDLE_VALUE)
 {
 	if (!InitSocketEnv())
 	{
@@ -25,20 +26,36 @@ CClientSocket::CClientSocket()
 
 CClientSocket::CClientSocket(const CClientSocket& other)
 { 
+	m_helper = other.m_helper;
+	m_instance = other.m_instance;
 	m_socket = other.m_socket;
+	m_packet = other.m_packet;
+	m_buf = other.m_buf;
 	m_nIp = other.m_nIp;
 	m_nPort = other.m_nPort;
 	m_isAutoClose = other.m_isAutoClose;
+	m_mapAck = other.m_mapAck;
+	m_mapAutoClose = other.m_mapAutoClose;
+	m_queueSend = other.m_queueSend;
+	m_hThread = other.m_hThread;
 }
 
 CClientSocket& CClientSocket::operator=(const CClientSocket& other)
 {
 	if (this != &other)
 	{
+		m_helper = other.m_helper;
+		m_instance = other.m_instance;
 		m_socket = other.m_socket;
+		m_packet = other.m_packet;
+		m_buf = other.m_buf;
 		m_nIp = other.m_nIp;
 		m_nPort = other.m_nPort;
 		m_isAutoClose = other.m_isAutoClose;
+		m_mapAck = other.m_mapAck;
+		m_mapAutoClose = other.m_mapAutoClose;
+		m_queueSend = other.m_queueSend;
+		m_hThread = other.m_hThread;
 	}
 	return *this;
 }
@@ -77,7 +94,9 @@ void CClientSocket::ThreadFunc()
 	{
 		if (m_queueSend.size() > 0)
 		{
+			m_mutex.lock();
 			CPacket& head = m_queueSend.front();
+			m_mutex.unlock();
 			if (!Send(head))
 			{
 				TRACE("Send Packet Failed\n");
@@ -133,9 +152,14 @@ void CClientSocket::ThreadFunc()
 				}
 			} while (!autoClose);
 			InitSocket();
+			m_mutex.lock();
 			m_queueSend.pop();
+			m_mutex.unlock();
 			SetEvent(head.hEvent);
 			m_mapAutoClose.erase(head.hEvent);
+		}
+		else {
+			Sleep(1);
 		}
 	}
 	CloseSocket();
@@ -349,18 +373,22 @@ void CClientSocket::UpdateAddress(ULONG nIp, USHORT nPort)
 
 BOOL CClientSocket::SendPacket(const CPacket& packet, std::list<CPacket> *lstAcks, BOOL bAutoClose)
 {
-	if (m_socket == INVALID_SOCKET)
+	if (m_socket == INVALID_SOCKET && m_hThread == INVALID_HANDLE_VALUE)
 	{
-		_beginthread(&CClientSocket::ThreadEntry, 0, this);
+		m_hThread = (HANDLE)_beginthread(&CClientSocket::ThreadEntry, 0, this);
 	}
+	m_mutex.lock();
 	auto pair = m_mapAck.insert(std::pair<HANDLE, std::list<CPacket>*>(packet.hEvent, lstAcks)).first;
 	m_mapAutoClose.insert(std::pair<HANDLE, BOOL>(packet.hEvent, bAutoClose));
 	m_queueSend.push(packet);
+	m_mutex.unlock();
 	WaitForSingleObject(packet.hEvent, INFINITE);
 	auto it = m_mapAck.find(packet.hEvent);
 	if (it != m_mapAck.end())
 	{
+		m_mutex.lock();
 		m_mapAck.erase(it);
+		m_mutex.unlock();
 		return TRUE;
 	}
 	return FALSE;

@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <queue>
+#include <mutex>
 #include <list>
 #include <map>
 #include "pch.h"
@@ -65,5 +66,7 @@ private:
 	BOOL m_isAutoClose;
 	std::map<HANDLE, std::list<CPacket>*> m_mapAck;
 	std::map<HANDLE, BOOL> m_mapAutoClose;
-	std::queue<CPacket> m_queueSend;
+	std::queue<CPacket> m_queueSend; // not thread safe
+	std::mutex m_mutex;
+	HANDLE m_hThread;
 };
