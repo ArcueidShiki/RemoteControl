@@ -121,7 +121,7 @@ BOOL CServerSocket::InitSocket(USHORT port /* = 20000 */)
 		MessageBox(NULL, _T("Cannot bind socket, please check network setting!"), _T("Socket Bind Error!"), MB_OK | MB_ICONERROR);
 		return FALSE;
 	}
-	if (listen(m_socket, 5) == SOCKET_ERROR)
+	if (listen(m_socket, 1) == SOCKET_ERROR)
 	{
 		MessageBox(NULL, _T("Cannot listen socket, please check network setting!"), _T("Socket Listen Error!"), MB_OK | MB_ICONERROR);
 		return FALSE;
@@ -217,7 +217,7 @@ int CServerSocket::Run(SOCKET_CALLBACK callback, void* arg, USHORT port)
 				lstPackets.pop_front();
 			}
 		}
-		CloseClient() ;
+		CloseClient();
 	}
 	return 0;
 }
