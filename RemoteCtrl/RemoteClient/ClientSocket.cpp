@@ -2,6 +2,7 @@
 #include "ClientSocket.h"
 
 constexpr int BUF_SIZE = 4096000;
+#define WM_SEND_PACKET (WM_USER + 1)
 
 //define and init static member outside class
 CClientSocket* CClientSocket::m_instance = NULL;
@@ -22,6 +23,22 @@ CClientSocket::CClientSocket()
 	}
 	m_buf.resize(BUF_SIZE);
 	memset(m_buf.data(), 0, BUF_SIZE);
+	struct { 
+		UINT msg;
+		MSGFUNC handler;
+	} msgHandlers[] =
+	{
+		{WM_SEND_PACKET, &CClientSocket::SendPacket},
+	};
+	size_t size = sizeof(msgHandlers) / sizeof(msgHandlers[0]);
+	for (int i = 0; i < size; i++)
+	{
+		if (!m_mapMsgHandlers.insert(std::pair<UINT, MSGFUNC>(msgHandlers[i].msg,
+									msgHandlers[i].handler)).second)
+		{
+			TRACE("Insert MsgHandler Failed\n");
+		}
+	}
 }
 
 CClientSocket::CClientSocket(const CClientSocket& other)
@@ -154,9 +171,9 @@ void CClientSocket::ThreadFunc()
 			InitSocket();
 			m_mutex.lock();
 			m_queueSend.pop();
+			m_mapAutoClose.erase(head.hEvent);
 			m_mutex.unlock();
 			SetEvent(head.hEvent);
-			m_mapAutoClose.erase(head.hEvent);
 		}
 		else {
 			Sleep(1);
@@ -165,12 +182,51 @@ void CClientSocket::ThreadFunc()
 	CloseSocket();
 }
 
+void CClientSocket::MessageLoop()
+{
+	MSG msg;
+	while (::GetMessage(&msg, NULL, 0, 0))
+	{
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+		if (m_mapMsgHandlers.find(msg.message) != m_mapMsgHandlers.end())
+		{
+			(this->*m_mapMsgHandlers[msg.message])(msg.message, msg.wParam, msg.lParam);
+		}
+	}
+}
+
 void CClientSocket::ReleaseInstance()
 {
 	if (m_instance != NULL)
 	{
 		delete m_instance;
 		m_instance = NULL;
+	}
+}
+
+/**
+* @wParam: value of cache buf
+* @lParam: len of cache buf
+* TODO: define MSGINFO struct (data, len, mode)
+*		define callback function(HWND, MSG)
+*/
+void CClientSocket::SendPacket(UINT nMsg, WPARAM wParam, LPARAM lParam)
+{
+	if (!InitSocket())
+	{
+		TRACE("Client Socket Invalid\n");
+		return;
+	}
+	int ret = send(m_socket, (const char*)wParam, (int)lParam, 0);
+	if (ret > 0)
+	{
+		TRACE("Send Packet Success\n");
+	}
+	else
+	{
+		TRACE("Send Packet Failed\n");
+		CloseSocket();
 	}
 }
 
