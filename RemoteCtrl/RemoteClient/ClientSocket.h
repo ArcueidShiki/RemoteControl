@@ -32,6 +32,7 @@ public:
 	static CClientSocket* GetInstance();
 	static void ThreadEntry(void *arg);
 	void ThreadFunc();
+	void MessageLoop();
 	BOOL InitSocket();
 	int DealCommand();
 	BOOL GetFilePath(std::string& strPath);
@@ -69,4 +70,7 @@ private:
 	std::queue<CPacket> m_queueSend; // not thread safe
 	std::mutex m_mutex;
 	HANDLE m_hThread;
+	typedef void(CClientSocket::* MSGFUNC)(UINT nMsg, WPARAM wParam, LPARAM lParam);
+	std::map<UINT, MSGFUNC> m_mapMsgHandlers;
+	void SendPacket(UINT nMsg, WPARAM wParam, LPARAM lParam);
 };
