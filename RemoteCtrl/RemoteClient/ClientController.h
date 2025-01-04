@@ -15,25 +15,24 @@ public:
 	static CClientController* GetInstance();
 	int InitController();
 	int Invoke(CWnd** pMainWnd);
-	LRESULT SendMsg(MSG msg);
-	void UpdateAddress(ULONG nIp, USHORT nPort);
 	int DealCommand();
-	void CloseSocket();
-	BOOL SendCommandPacket(HWND hWnd, int nCmd, BYTE* pData = NULL,
-						  size_t nLength = 0, BOOL bAutoClose = TRUE, WPARAM wParam = 0);
 	int GetImage(CImage& img);
 	int DownloadFile(CString strPath);
+	void CloseSocket();
+	void DownloadEnd();
 	void StartWatchScreen();
+	void UpdateAddress(ULONG nIp, USHORT nPort);
+	LRESULT SendMsg(MSG msg);
+	BOOL SendCommandPacket(HWND hWnd, int nCmd, BYTE* pData = NULL,
+						  size_t nLength = 0, BOOL bAutoClose = TRUE, WPARAM wParam = 0);
 protected:
-	static void ReleaseInstance();
 	CClientController();
 	~CClientController();
-	void ThreadFunc();
-	void ThreadDownloadFile();
-	static void __stdcall ThreadDownloadEntry(void* arg);
-	static UINT __stdcall ThreadEntry(void* arg);
-	void ThreadWatchScreen();
+	static UINT __stdcall ThreadEntryMessageLoop(void* arg);
 	static void __stdcall ThreadWatchScreenEntry(void* arg);
+	static void ReleaseInstance();
+	void MessageLoop();
+	void ThreadWatchScreen();
 	LRESULT OnShowtatus(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	LRESULT OnShowWatch(UINT nMsg, WPARAM wParam, LPARAM lParam);
 private:

@@ -32,7 +32,7 @@ CClientController::CClientController()
 int CClientController::InitController()
 {
 	// Create Handle Message Loop Thread with m_tid!
-	m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CClientController::ThreadEntry, this, 0, &m_tid);
+	m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CClientController::ThreadEntryMessageLoop, this, 0, &m_tid);
 	m_statusDlg.Create(IDD_DLG_STATUS, m_clientDlg);
 	struct {
 		UINT nMsg;
@@ -122,7 +122,7 @@ void CClientController::CloseSocket()
 
 BOOL CClientController::SendCommandPacket(HWND hWnd, int nCmd, BYTE* pData, size_t nLength, BOOL bAutoClose, WPARAM wParam)
 {
-	return CClientSocket::GetInstance()->SendPacket(hWnd, CPacket(nCmd, pData, nLength), bAutoClose);
+	return CClientSocket::GetInstance()->SendPacket(hWnd, CPacket(nCmd, pData, nLength), bAutoClose, wParam);
 }
 
 /**
@@ -139,7 +139,8 @@ int CClientController::DownloadFile(CString strPath)
 	CFileDialog fileDlg(FALSE, L"*", strPath,
 					OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT,
 					NULL, m_clientDlg);
-	if (fileDlg.DoModal() == IDOK)
+	INT_PTR action = fileDlg.DoModal();
+	if (action == IDOK)
 	{
 		memset(m_localPath, 0, MAX_PATH);
 		memset(m_remotePath, 0, MAX_PATH);
@@ -152,16 +153,40 @@ int CClientController::DownloadFile(CString strPath)
 		char* asciiRemote = RPath;
 		memcpy(m_remotePath, asciiRemote, strlen(asciiRemote) + 1);
 		size_t len = strlen(m_remotePath);
+
 		TRACE("Remote Path:[%s], Local Path:[%s] len:[%d]\n", m_remotePath, m_localPath, strlen(m_remotePath));
-		// std::thread(&CClientController::ThreadDownloadFile, this).detach();
-		m_hThreadDownload = (HANDLE)_beginthread(&CClientController::ThreadDownloadEntry, 0, this);
-		// why? just wait for it created?
-		if (WaitForSingleObject(m_hThreadDownload, 0) != WAIT_TIMEOUT)
+
+		FILE* pFile;
+		int err = fopen_s(&pFile, m_localPath, "wb+");
+		if (err != 0 || pFile == NULL)
 		{
+			AfxMessageBox(L"Open Dlg File Failed\n");
 			return -1;
 		}
+		int ret = SendCommandPacket(m_clientDlg->GetSafeHwnd(),
+									CMD_DLD_FILE, (BYTE*)m_remotePath,
+									strlen(m_remotePath), FALSE, (WPARAM)pFile);
+		m_clientDlg->BeginWaitCursor();
+		m_statusDlg.m_info.SetWindowText(L"Downloading...");
+		m_statusDlg.ShowWindow(SW_SHOW); // active window accept keyboard input
+		m_statusDlg.CenterWindow(m_clientDlg);
+		m_statusDlg.SetActiveWindow();
 	}
+	else if (action == IDCANCEL)
+	{
+		m_clientDlg->MessageBox(L"Cancel download", L"Cancel");
+		return -1;
+	}
+
 	return 0;
+}
+
+void CClientController::DownloadEnd()
+{
+	CloseSocket();
+	m_statusDlg.ShowWindow(SW_HIDE);
+	m_clientDlg->EndWaitCursor();
+	m_clientDlg->MessageBox(_T("Download End"), _T("Download End"));
 }
 
 void CClientController::StartWatchScreen()
@@ -174,7 +199,7 @@ void CClientController::StartWatchScreen()
 	WaitForSingleObject(m_hThreadWatch, 500);
 }
 
-void CClientController::ThreadFunc()
+void CClientController::MessageLoop()
 {
 	MSG msg; // Message Loop
 	while (::GetMessage(&msg, NULL, 0, 0))
@@ -212,73 +237,10 @@ void CClientController::ThreadFunc()
 	}
 }
 
-// Need return value ?
-void CClientController::ThreadDownloadFile()
-{
-	FILE* pFile;
-	int err = fopen_s(&pFile, m_localPath, "wb+");
-	TRACE("Remote Path:[%s], Local Path:[%s] len:[%d]\n", m_remotePath, m_localPath, strlen(m_remotePath));
-	if (err != 0 || pFile == NULL)
-	{
-		AfxMessageBox(L"Open Dlg File Failed\n");
-		TRACE("Open Download Path : [%s] Failed\n", m_localPath);
-		m_statusDlg.ShowWindow(SW_HIDE);
-		m_clientDlg->EndWaitCursor();
-		return;
-	}
-	// send request
-	std::list<CPacket> lstAcks;
-	int ret = SendCommandPacket(m_clientDlg->GetSafeHwnd(), CMD_DLD_FILE, (BYTE*)m_remotePath, strlen(m_remotePath), FALSE);
-	if (ret < 0 || lstAcks.empty())
-	{
-		AfxMessageBox(L"Donwload File Failed");
-		TRACE("Download File Failed ret = %d\n", ret);
-		m_statusDlg.ShowWindow(SW_HIDE);
-		m_clientDlg->EndWaitCursor();
-		return;
-	}
-	// receive file length
-	auto nLength = *(long long*)lstAcks.front().strData.c_str();
-	if (nLength == 0)
-	{
-		AfxMessageBox(L"File size is Zero or Download File Failed");
-		TRACE("Download File Failed, File Size = 0\n");
-		m_statusDlg.ShowWindow(SW_HIDE);
-		m_clientDlg->EndWaitCursor();
-		return;
-	}
-	TRACE("Client Filename:[%s], size:[%lld]\n", m_localPath, nLength);
-	long long nCount = 0;
-	m_clientDlg->BeginWaitCursor();
-	m_statusDlg.m_info.SetWindowText(L"Downloading...");
-	m_statusDlg.ShowWindow(SW_SHOW); // active window accept keyboard input
-	m_statusDlg.CenterWindow(m_clientDlg);
-	m_statusDlg.SetActiveWindow();
-	while (nCount < nLength)
-	{
-		lstAcks.pop_front();
-		std::string data = lstAcks.front().strData;
-		nCount += data.size();
-		fwrite(data.c_str(), 1, data.size(), pFile);
-	}
-	fclose(pFile);
-	m_statusDlg.ShowWindow(SW_HIDE);
-	m_clientDlg->EndWaitCursor();
-
-	CClientController::GetInstance()->CloseSocket();
-}
-
-void __stdcall CClientController::ThreadDownloadEntry(void* arg)
+UINT __stdcall CClientController::ThreadEntryMessageLoop(void* arg)
 {
 	CClientController* self = (CClientController*)arg;
-	self->ThreadDownloadFile();
-	_endthread();
-}
-
-UINT __stdcall CClientController::ThreadEntry(void* arg)
-{
-	CClientController* self = (CClientController*)arg;
-	self->ThreadFunc();
+	self->MessageLoop();
 	_endthreadex(0);
 	return 0;
 }

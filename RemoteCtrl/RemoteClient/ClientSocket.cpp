@@ -250,6 +250,7 @@ void CClientSocket::SendPacket(UINT nMsg, WPARAM wParam, LPARAM lParam)
 	PACKET_DATA data = *(PACKET_DATA*)wParam;
 	delete (PACKET_DATA*)wParam;
 	HWND hWnd = (HWND)lParam;	// ack back to dlg wnd
+	// TODO data.wParam = pFile
 	int n_sent = send(m_socket, data.strData.c_str(), (int)data.strData.size(), 0);
 	if (n_sent > 0)
 	{
@@ -267,9 +268,9 @@ void CClientSocket::SendPacket(UINT nMsg, WPARAM wParam, LPARAM lParam)
 				CPacket packet((BYTE*)pBuf, n_parsed);
 				if ((int)n_parsed > 0)
 				{
+					::SendMessage(hWnd, WM_SEND_PACKET_ACK, (WPARAM)new CPacket(packet), data.wParam);
 					if (data.nMode & CSM_AUTOCLOSE)
 					{
-						::SendMessage(hWnd, WM_SEND_PACKET_ACK, (WPARAM)new CPacket(packet), NULL);
 						CloseSocket();
 						return;
 					}
@@ -288,7 +289,6 @@ void CClientSocket::SendPacket(UINT nMsg, WPARAM wParam, LPARAM lParam)
 						::SendMessage(hWnd, WM_SEND_PACKET_ACK, NULL, 1);
 						TRACE("Server side close, Recv 0, but still can parse Packet out, has leftover in buffer, index:[%d] < n_parsed:[%d]\n", index, n_parsed);
 					}
-					::SendMessage(hWnd, WM_SEND_PACKET_ACK, (WPARAM)new CPacket(packet), NULL);
 				}
 			}
 			else
@@ -503,13 +503,13 @@ void CClientSocket::UpdateAddress(ULONG nIp, USHORT nPort)
 	m_nPort = nPort;
 }
 
-BOOL CClientSocket::SendPacket(HWND hWnd, const CPacket& packet, BOOL bAutoClose, WPARAM wParm)
+BOOL CClientSocket::SendPacket(HWND hWnd, const CPacket& packet, BOOL bAutoClose, WPARAM wParam)
 {
 	UINT nMode = bAutoClose ? CSM_AUTOCLOSE : 0;
 	std::string data;
 	packet.GetData(data);
-	PACKET_DATA* pData = new PACKET_DATA(data.c_str(), data.size(), nMode);
-	BOOL ret = PostThreadMessage(m_nTid, WM_SEND_PACKET, (WPARAM)pData, (LPARAM)hWnd); // TODO: add wParm ?
+	PACKET_DATA* pData = new PACKET_DATA(data.c_str(), data.size(), nMode, wParam);
+	BOOL ret = PostThreadMessage(m_nTid, WM_SEND_PACKET, (WPARAM)pData, (LPARAM)hWnd);
 	if (!ret)
 	{
 		delete pData;
