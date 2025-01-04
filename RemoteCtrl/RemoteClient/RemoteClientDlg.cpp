@@ -237,10 +237,8 @@ void CRemoteClientDlg::LoadDirectory()
 	{
 		// The item is already expanded, so collapse it
 		m_tree.Expand(m_hTreeSelected, TVE_COLLAPSE);
-		// BUG: collapsed but it still expand after function execution
 		return;
 	}
-	// TODO :using cache
 	DeleteTreeChildrenItem(m_hTreeSelected);
 	m_list.DeleteAllItems();
 	CString strPath = GetPath(m_hTreeSelected);
@@ -260,23 +258,7 @@ void CRemoteClientDlg::LoadFiles()
 	const char* path = asciiPath;
 	size_t strLen = strlen(asciiPath);
 	TRACE("strPath: %s Length: %zu\n", path, strLen);
-	std::list<CPacket> lstAcks;
-	int nCmd = CClientController::GetInstance()->SendCommandPacket(GetSafeHwnd(), CMD_DIR, (BYTE*)path, strLen);
-	PFILEINFO pInfo = (PFILEINFO)lstAcks.front().strData.c_str();
-	int id = 0;
-	while (pInfo->HasNext && !lstAcks.empty())
-	{
-		//TRACE("Client receive file id: [%d], name: [%s] Has Next: [%d] \n", ++id, pInfo->szFileName, pInfo->HasNext);
-		if (!pInfo->IsDirectory)
-		{
-			// FILE
-			//TRACE("Insert file:%s\n", pInfo->szFileName);
-			m_list.InsertItem(0, CString(pInfo->szFileName));
-		}
-		lstAcks.pop_front();
-		if (lstAcks.empty()) break;
-		pInfo = (PFILEINFO)lstAcks.front().strData.c_str();
-	}
+	int nCmd = CClientController::GetInstance()->SendCommandPacket(GetSafeHwnd(), CMD_DIR, (BYTE*)path, strLen, FALSE);
 }
 
 void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
@@ -345,7 +327,6 @@ void CRemoteClientDlg::OnDeleteFile()
 		AfxMessageBox(L"Delete File Failed");
 		TRACE("Delete File Failed, ret = %d\n", ret);
 	}
-	LoadFiles();
 }
 
 
@@ -413,6 +394,7 @@ void CRemoteClientDlg::GetFile(CPacket &response)
 	}
 	else {
 		m_tree.Expand(m_hTreeSelected, TVE_EXPAND);
+		//m_tree.UpdateData();
 	}
 }
 
@@ -442,9 +424,9 @@ LRESULT CRemoteClientDlg::OnSendPacketAck(WPARAM wParm, LPARAM lParam)
 			{
 				case CMD_DRIVER: GetDrivers(response); break;
 				case CMD_DIR: GetFile(response); break;
-				case CMD_DLD_FILE: break;
-				case CMD_DEL_FILE: break;
-				case CMD_RUN_FILE: break;
+				case CMD_DLD_FILE: break; // donwload can't be done in this thread
+				case CMD_DEL_FILE: LoadFiles(); break;
+				case CMD_RUN_FILE: break; // Don't need response
 				default: break;
 			}
 		}
