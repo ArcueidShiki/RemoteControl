@@ -256,15 +256,6 @@ void CClientController::ThreadDownloadFile()
 	m_statusDlg.SetActiveWindow();
 	while (nCount < nLength)
 	{
-		/*ret = CClientController::GetInstance()->DealCommand();*/
-		//if (ret < 0)
-		//{
-		//	AfxMessageBox(L"Transmission Failed\n");
-		//	TRACE("Download File Failed, Deal Command Failed ret = %d\n", ret);
-		//	m_statusDlg.ShowWindow(SW_HIDE);
-		//	m_clientDlg->EndWaitCursor();
-		//	break;
-		//}
 		lstAcks.pop_front();
 		std::string data = lstAcks.front().strData;
 		nCount += data.size();
