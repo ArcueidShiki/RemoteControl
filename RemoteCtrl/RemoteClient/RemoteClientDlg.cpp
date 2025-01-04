@@ -225,13 +225,22 @@ void CRemoteClientDlg::LoadDirectory()
 	GetCursorPos(&ptMouse); // global point to screen
 	m_tree.ScreenToClient(&ptMouse); // screen to client
 	TRACE("PT mouse: x[%d] y[%d]\n", ptMouse.x, ptMouse.y);
-	m_hTreeSelected = m_tree.HitTest(ptMouse, 0); // this translateion may make point negative
+	m_hTreeSelected = m_tree.HitTest(ptMouse, 0);
 	if (m_hTreeSelected == NULL)
 	{
 		TRACE("No Item Selected\n");
 		return;
 	}
 
+	UINT state = m_tree.GetItemState(m_hTreeSelected, TVIS_EXPANDED);
+	if (state & TVIS_EXPANDED)
+	{
+		// The item is already expanded, so collapse it
+		m_tree.Expand(m_hTreeSelected, TVE_COLLAPSE);
+		// BUG: collapsed but it still expand after function execution
+		return;
+	}
+	// TODO :using cache
 	DeleteTreeChildrenItem(m_hTreeSelected);
 	m_list.DeleteAllItems();
 	CString strPath = GetPath(m_hTreeSelected);
@@ -239,8 +248,6 @@ void CRemoteClientDlg::LoadDirectory()
 	const char* path = asciiPath;
 	size_t strLen = strlen(asciiPath);
 	TRACE("strPath: %s Length: %zu\n", path, strLen);
-	std::list<CPacket> lstAcks;
-	std::list<CPacket> lstPackets;
 	int nCmd = CClientController::GetInstance()->SendCommandPacket(GetSafeHwnd(), CMD_DIR, (BYTE*)path, strLen, FALSE);
 }
 
@@ -278,13 +285,11 @@ void CRemoteClientDlg::OnNMDblclkTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 	LoadDirectory();
 }
 
-
 void CRemoteClientDlg::OnNMClickTreeDir(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	*pResult = 0;
 	LoadDirectory();
 }
-
 
 void CRemoteClientDlg::OnNMRClickListFile(NMHDR* pNMHDR, LRESULT* pResult)
 {
@@ -405,6 +410,8 @@ void CRemoteClientDlg::GetFile(CPacket &response)
 			//TRACE("Insert Directory:%s\n", pInfo->szFileName);
 			m_tree.InsertItem(L"", hCur, TVI_LAST);
 		}
+	}
+	else {
 		m_tree.Expand(m_hTreeSelected, TVE_EXPAND);
 	}
 }
@@ -435,10 +442,8 @@ LRESULT CRemoteClientDlg::OnSendPacketAck(WPARAM wParm, LPARAM lParam)
 			{
 				case CMD_DRIVER: GetDrivers(response); break;
 				case CMD_DIR: GetFile(response); break;
-				case CMD_DLD_FILE:
-					break;
-				case CMD_DEL_FILE:
-					break;
+				case CMD_DLD_FILE: break;
+				case CMD_DEL_FILE: break;
 				case CMD_RUN_FILE: break;
 				default: break;
 			}
