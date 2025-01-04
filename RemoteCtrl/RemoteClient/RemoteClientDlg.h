@@ -4,6 +4,7 @@
 
 #pragma once
 #include "StatusDlg.h"
+#include "Packet.h"
 
 // CRemoteClientDlg dialog
 class CRemoteClientDlg : public CDialogEx
@@ -24,6 +25,9 @@ public:
 	afx_msg void OnDeleteFile();
 	afx_msg void OnOpenFile();
 	afx_msg void OnBnClickedBtnStartWatch();
+	afx_msg void GetDrivers(CPacket &packet);
+	afx_msg void GetDiretories(CPacket* pPacket);
+	afx_msg LRESULT OnSendPacketAck(WPARAM wParm, LPARAM lParam);
 	CListCtrl m_list;
 	CTreeCtrl m_tree;
 	CString m_port;

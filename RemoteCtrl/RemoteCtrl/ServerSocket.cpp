@@ -231,7 +231,7 @@ BOOL CServerSocket::Send(const char* pData, size_t nSize)
 BOOL CServerSocket::Send(CPacket& packet)
 {
 	if (m_client == INVALID_SOCKET) return FALSE;
-	return send(m_client, packet.Data(), (int)packet.Size(), 0) != SOCKET_ERROR;
+	return send(m_client, packet.GetData(), (int)packet.Size(), 0) != SOCKET_ERROR;
 }
 
 void CServerSocket::CloseClient()

@@ -13,7 +13,9 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
-
+#ifndef WM_SEND_PACKET_ACK
+#define WM_SEND_PACKET_ACK (WM_USER + 2)
+#endif
 
 // CAboutDlg dialog used for App About
 class CAboutDlg : public CDialogEx
@@ -82,6 +84,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BTN_START_WATCH, &CRemoteClientDlg::OnBnClickedBtnStartWatch)
 	ON_NOTIFY(IPN_FIELDCHANGED, IDC_IPADDRESS_SERV, &CRemoteClientDlg::OnIpnFieldchangedIpaddressServ)
 	ON_EN_CHANGE(IDC_EDIT_PORT, &CRemoteClientDlg::OnEnChangeEditPort)
+	ON_MESSAGE(WM_SEND_PACKET_ACK, &CRemoteClientDlg::OnSendPacketAck)
 END_MESSAGE_MAP()
 
 BOOL CRemoteClientDlg::OnInitDialog()
@@ -174,32 +177,15 @@ HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 
 void CRemoteClientDlg::OnBnClickedBtnTest()
 {
-	CClientController::GetInstance()->SendCommandPacket(CMD_DRIVER);
+	CClientController::GetInstance()->SendCommandPacket(GetSafeHwnd(), CMD_DRIVER);
 }
 
 void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 {
-	std::list<CPacket> lstPackets;
-	if (CClientController::GetInstance()->SendCommandPacket(CMD_DRIVER, NULL, 0, &lstPackets) == -1)
+	if (CClientController::GetInstance()->SendCommandPacket(GetSafeHwnd(), CMD_DRIVER, NULL, 0) == -1)
 	{
 		AfxMessageBox(_T("Send Command Packet Failed"));
-		return;
 	}
-	std::string drivers = lstPackets.front().strData;
-	std::string driver;
-	m_tree.DeleteAllItems();
-	for (size_t i = 0; i < drivers.size(); i++)
-	{
-		if (drivers[i] != ',')
-		{
-			driver = drivers[i];
-			driver += ":";
-			HTREEITEM hCur = m_tree.InsertItem(CString(driver.c_str()), TVI_ROOT, TVI_LAST);
-			m_tree.InsertItem(L"", hCur, TVI_LAST);
-			driver.clear();
-		}
-	}
-	UpdateData(FALSE);
 }
 
 /**
@@ -253,7 +239,8 @@ void CRemoteClientDlg::LoadDirectory()
 	size_t strLen = strlen(asciiPath);
 	TRACE("strPath: %s Length: %zu\n", path, strLen);
 	std::list<CPacket> lstAcks;
-	int nCmd = CClientController::GetInstance()->SendCommandPacket(CMD_DIR, (BYTE*)path, strLen, &lstAcks, FALSE);
+	std::list<CPacket> lstPackets;
+	int nCmd = CClientController::GetInstance()->SendCommandPacket(GetSafeHwnd(), CMD_DIR, (BYTE*)path, strLen, FALSE);
 	PFILEINFO pInfo = (PFILEINFO)lstAcks.front().strData.c_str();
 	int id = 0;
 	while (pInfo->HasNext && !lstAcks.empty())
@@ -288,7 +275,7 @@ void CRemoteClientDlg::LoadFiles()
 	size_t strLen = strlen(asciiPath);
 	TRACE("strPath: %s Length: %zu\n", path, strLen);
 	std::list<CPacket> lstAcks;
-	int nCmd = CClientController::GetInstance()->SendCommandPacket(CMD_DIR, (BYTE*)path, strLen, &lstAcks);
+	int nCmd = CClientController::GetInstance()->SendCommandPacket(GetSafeHwnd(), CMD_DIR, (BYTE*)path, strLen);
 	PFILEINFO pInfo = (PFILEINFO)lstAcks.front().strData.c_str();
 	int id = 0;
 	while (pInfo->HasNext && !lstAcks.empty())
@@ -368,7 +355,7 @@ void CRemoteClientDlg::OnDeleteFile()
 	char* fullpath = asciiFullPath;
 	// wcstombs_s(&nConverted, fullpath, MAX_PATH, asciiFullPath, MAX_PATH);
 	TRACE("Full File Path : [%s], name len:[%zu]\n", fullpath, strlen(fullpath));
-	int ret = CClientController::GetInstance()->SendCommandPacket(CMD_DEL_FILE, (BYTE*)fullpath, strlen(fullpath));
+	int ret = CClientController::GetInstance()->SendCommandPacket(GetSafeHwnd(), CMD_DEL_FILE, (BYTE*)fullpath, strlen(fullpath));
 	if (ret < 0)
 	{
 		AfxMessageBox(L"Delete File Failed");
@@ -387,7 +374,7 @@ void CRemoteClientDlg::OnOpenFile()
 	CT2A asciiFullPath(dirPath + strFile);
 	char* fullpath = asciiFullPath;
 	TRACE("Full File Path : [%s], name len:[%zu]\n", fullpath, strlen(fullpath));
-	int ret = CClientController::GetInstance()->SendCommandPacket(CMD_RUN_FILE, (BYTE*)fullpath, strlen(fullpath));
+	int ret = CClientController::GetInstance()->SendCommandPacket(GetSafeHwnd(), CMD_RUN_FILE, (BYTE*)fullpath, strlen(fullpath));
 	if (ret < 0)
 	{
 		AfxMessageBox(L"Open File Failed");
@@ -398,6 +385,69 @@ void CRemoteClientDlg::OnOpenFile()
 void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 {
 	CClientController::GetInstance()->StartWatchScreen();
+}
+
+void CRemoteClientDlg::GetDrivers(CPacket &packet)
+{
+
+	std::string drivers = packet.strData;
+	std::string driver;
+	m_tree.DeleteAllItems();
+	for (size_t i = 0; i < drivers.size(); i++)
+	{
+		if (drivers[i] != ',')
+		{
+			driver = drivers[i];
+			driver += ":";
+			HTREEITEM hCur = m_tree.InsertItem(CString(driver.c_str()), TVI_ROOT, TVI_LAST);
+			m_tree.InsertItem(L"", hCur, TVI_LAST);
+			driver.clear();
+		}
+	}
+	UpdateData(FALSE);
+}
+
+void CRemoteClientDlg::GetDiretories(CPacket* pPacket)
+{
+}
+
+LRESULT CRemoteClientDlg::OnSendPacketAck(WPARAM wParm, LPARAM lParam)
+{
+	if (lParam < 0)
+	{
+		// TODO: error handle
+	}
+	else if (lParam == 1)
+	{
+		// server side close socket.
+	}
+	else
+	{
+		CPacket* pPacket = (CPacket*)wParm;
+		CPacket head;
+		if (pPacket)
+		{
+			head = *pPacket;
+			delete pPacket;
+			switch (head.sCmd)
+			{
+			case CMD_DRIVER:
+				GetDrivers(head);
+				break;
+			case CMD_DIR:
+				break;
+			case CMD_DLD_FILE:
+				break;
+			case CMD_RUN_FILE:
+				break;
+			case CMD_DEL_FILE:
+				break;
+			default:
+				break;
+			}
+		}
+	}
+	return 0;
 }
 
 

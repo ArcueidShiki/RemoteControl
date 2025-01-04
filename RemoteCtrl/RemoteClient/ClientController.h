@@ -19,8 +19,8 @@ public:
 	void UpdateAddress(ULONG nIp, USHORT nPort);
 	int DealCommand();
 	void CloseSocket();
-	int SendCommandPacket(int nCmd, BYTE* pData = NULL, size_t nLength = 0,
-						  std::list<CPacket> *pLstAcks = NULL, BOOL bAutoClose = TRUE);
+	BOOL SendCommandPacket(HWND hWnd, int nCmd, BYTE* pData = NULL,
+						  size_t nLength = 0, BOOL bAutoClose = TRUE, WPARAM wParam = 0);
 	int GetImage(CImage& img);
 	int DownloadFile(CString strPath);
 	void StartWatchScreen();

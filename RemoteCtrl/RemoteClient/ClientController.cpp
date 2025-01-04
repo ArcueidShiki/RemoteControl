@@ -120,35 +120,9 @@ void CClientController::CloseSocket()
 	CClientSocket::GetInstance()->CloseSocket();
 }
 
-int CClientController::SendCommandPacket(int nCmd, BYTE* pData, size_t nLength,
-										 std::list<CPacket>* pLstAcks, BOOL bAutoClose)
+BOOL CClientController::SendCommandPacket(HWND hWnd, int nCmd, BYTE* pData, size_t nLength, BOOL bAutoClose, WPARAM wParam)
 {
-	CClientSocket* pClient = CClientSocket::GetInstance();
-	if (!pClient) return FALSE;
-	//if (!pClient->InitSocket()) return FALSE;
-	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (!hEvent)
-	{
-		TRACE("Create Event failed\n");;
-		return -1;
-	}
-	// TODO: Shouldn't directly send, add packet to queue.
-	std::list<CPacket> lstAcks;
-	if (!pLstAcks)
-	{
-		pLstAcks = &lstAcks;
-	}
-	if (!pClient->SendPacket(CPacket(nCmd, pData, nLength, hEvent), pLstAcks, bAutoClose))
-	{
-		TRACE("Client Send Paccket Failed\r\n");
-		return -1;
-	}
-	CloseHandle(hEvent); // prevent handle leak
-	if (pLstAcks->size())
-	{
-		return pLstAcks->front().sCmd;
-	}
-	return -1;
+	return CClientSocket::GetInstance()->SendPacket(hWnd, CPacket(nCmd, pData, nLength), bAutoClose);
 }
 
 /**
@@ -254,7 +228,7 @@ void CClientController::ThreadDownloadFile()
 	}
 	// send request
 	std::list<CPacket> lstAcks;
-	int ret = SendCommandPacket(CMD_DLD_FILE, (BYTE*)m_remotePath, strlen(m_remotePath), &lstAcks, FALSE);
+	int ret = SendCommandPacket(m_clientDlg->GetSafeHwnd(), CMD_DLD_FILE, (BYTE*)m_remotePath, strlen(m_remotePath), FALSE);
 	if (ret < 0 || lstAcks.empty())
 	{
 		AfxMessageBox(L"Donwload File Failed");
@@ -312,7 +286,7 @@ void __stdcall CClientController::ThreadDownloadEntry(void* arg)
 
 UINT __stdcall CClientController::ThreadEntry(void* arg)
 {
-	CClientController *self = (CClientController*)arg;
+	CClientController* self = (CClientController*)arg;
 	self->ThreadFunc();
 	_endthreadex(0);
 	return 0;
@@ -321,29 +295,23 @@ UINT __stdcall CClientController::ThreadEntry(void* arg)
 void CClientController::ThreadWatchScreen()
 {
 	Sleep(50);
+	ULONGLONG nTick = GetTickCount64();
 	while (!m_isWatchDlgClosed)
 	{
 		if (!m_watchDlg.isImageBufFull())
 		{
-			std::list<CPacket> lstPackets;
-			if (SendCommandPacket(CMD_SEND_SCREEN, NULL, 0, &lstPackets, FALSE)
-				== CMD_SEND_SCREEN)
+			if (GetTickCount64() - nTick < 200)
 			{
-				if (CUtils::Bytes2Image(m_watchDlg.GetImage(),
-							lstPackets.front().strData) == 0)
-				{
-					m_watchDlg.SetIsImageBufFull(TRUE);
-				}
-				else
-				{
-					TRACE("Get Image Failed\n");
-				}
+				Sleep((DWORD)(nTick + 200 - GetTickCount64()));
+			}
+			// watchDlg Hwnd receive WM_SEND_PACKET_ACK msg
+			if (!SendCommandPacket(m_watchDlg.GetSafeHwnd(), CMD_SEND_SCREEN, NULL, 0, FALSE))
+			{
+				TRACE("Get Image Failed\n");
 			}
 		}
-		else
-		{
-			Sleep(1);
-		}
+		Sleep(1);
+		nTick = GetTickCount64();
 	}
 }
 

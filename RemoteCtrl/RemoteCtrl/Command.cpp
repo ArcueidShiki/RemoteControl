@@ -49,7 +49,7 @@ int CCommand::MakeDriverInfo(std::list<CPacket>& lstPackets, CPacket& inPacket)
     // sCmd, data "C,D,E"
     // CPacket packet(CMD_DRIVER, (BYTE*)result.c_str(), result.size());
     // FF FE(head) 09 00 00 00(length = datasize + cmd+sum) 01 00(cnd) 43 2C 44 2C 45(C(43),D(44),E(45)) 24 01(01 24 = 43 + 2C + 44 + 2C + 45)
-    // CUtils::Dump((BYTE*)packet.Data(), packet.Size());
+    // CUtils::Dump((BYTE*)packet.GetData(), packet.Size());
     lstPackets.emplace_back(std::move(CPacket(CMD_DRIVER, (BYTE*)result.c_str(), result.size())));
     return 0;
 }
