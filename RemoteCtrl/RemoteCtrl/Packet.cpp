@@ -122,7 +122,7 @@ size_t CPacket::Size() const
 	return sizeof(sHead) + nLength + sizeof(sCmd) + sizeof(sSum);
 }
 
-const char* CPacket::Data()
+const char* CPacket::GetData()
 {
 	strOut.resize(Size());
 	BYTE* pData = (BYTE*)strOut.c_str();

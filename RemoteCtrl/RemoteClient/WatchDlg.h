@@ -1,5 +1,6 @@
 #pragma once
 #include "afxdialogex.h"
+#include <string>
 // CWatchDlg dialog
 
 class CWatchDlg : public CDialog
@@ -30,6 +31,8 @@ public:
 	afx_msg void OnStnClickedWatch();
 	afx_msg void OnBnClickedBtnUnlock();
 	afx_msg void OnBnClickedBtnLock();
+	afx_msg void ShowImage(std::string& data);
+	afx_msg LRESULT OnSendPacketAck(WPARAM wParm, LPARAM lParam);
 	BOOL isImageBufFull() const;
 	void SetIsImageBufFull(BOOL isFull = TRUE);
 	void OnOK();

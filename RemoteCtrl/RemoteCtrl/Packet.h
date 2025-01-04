@@ -26,7 +26,7 @@ public:
 	CPacket& operator=(const CPacket& other);
 	~CPacket() {}
 	size_t Size() const;
-	const char* Data();
+	const char* GetData();
 public:
 	WORD sHead;	// FE FF
 	DWORD nLength; // packet length

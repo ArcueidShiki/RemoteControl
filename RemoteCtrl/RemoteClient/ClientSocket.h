@@ -30,9 +30,9 @@ class CClientSocket
 public:
 	// static function no this pointer, belongs to class. can access non static member.
 	static CClientSocket* GetInstance();
-	static void ThreadEntry(void *arg);
-	void ThreadFunc();
-	void MessageLoop();
+	static UINT __stdcall ThreadEntryMessageLoop(void *arg);
+	//void ThreadFunc();
+	void ThreadMessageLoop();
 	BOOL InitSocket();
 	int DealCommand();
 	BOOL GetFilePath(std::string& strPath);
@@ -40,7 +40,7 @@ public:
 	void CloseSocket();
 	CPacket& GetPacket() { return m_packet; }
 	void UpdateAddress(ULONG nIp, USHORT nPort);
-	BOOL SendPacket(const CPacket &packet, std::list<CPacket> *lstAcks, BOOL bAutoClose = TRUE);
+	BOOL SendPacket(HWND hWnd, const CPacket& packet, BOOL bAutoClose = TRUE, WPARAM wParam = 0);
 private:
 	// Initialize before main
 	// Singleton, private all constructors
@@ -70,7 +70,9 @@ private:
 	std::queue<CPacket> m_queueSend; // not thread safe
 	std::mutex m_mutex;
 	HANDLE m_hThread;
+	UINT m_nTid;
 	typedef void(CClientSocket::* MSGFUNC)(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	std::map<UINT, MSGFUNC> m_mapMsgHandlers;
 	void SendPacket(UINT nMsg, WPARAM wParam, LPARAM lParam);
+	HANDLE m_hEeventInvoke;	// Message Loop Thread started up event.
 };

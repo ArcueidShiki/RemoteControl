@@ -6,11 +6,10 @@ CPacket::CPacket()
 	, nLength(0)
 	, sCmd(0)
 	, sSum(0)
-	, hEvent(INVALID_HANDLE_VALUE)
 {
 }
 
-CPacket::CPacket(const BYTE* pData, size_t& nSize, HANDLE hEvent)
+CPacket::CPacket(const BYTE* pData, size_t& nSize)
 	: sHead(0)
 	, nLength(0)
 	, sCmd(0)
@@ -83,7 +82,6 @@ CPacket::CPacket(const CPacket& other)
 	sCmd = other.sCmd;
 	strData = other.strData;
 	sSum = other.sSum;
-	hEvent = other.hEvent;
 }
 
 CPacket& CPacket::operator=(const CPacket& other)
@@ -95,12 +93,11 @@ CPacket& CPacket::operator=(const CPacket& other)
 		sCmd = other.sCmd;
 		strData = other.strData;
 		sSum = other.sSum;
-		hEvent = other.hEvent;
 	}
 	return *this;
 }
 
-CPacket::CPacket(WORD nCmd, const BYTE* pData, size_t nSize, HANDLE hEvent)
+CPacket::CPacket(WORD nCmd, const BYTE* pData, size_t nSize)
 {
 	sHead = PACKET_HEAD;
 	nLength = DWORD(nSize + sizeof(sCmd) + sizeof(sSum));
@@ -119,7 +116,6 @@ CPacket::CPacket(WORD nCmd, const BYTE* pData, size_t nSize, HANDLE hEvent)
 	{
 		sSum += BYTE(strData[i]);
 	}
-	this->hEvent = hEvent;
 }
 
 size_t CPacket::Size() const
@@ -130,7 +126,7 @@ size_t CPacket::Size() const
 /**
 Only for dump packet data
 */
-const char* CPacket::Data(std::string &strOut) const
+const char* CPacket::GetData(std::string &strOut) const
 {
 	strOut.resize(Size());
 	BYTE* pData = (BYTE*)strOut.c_str();

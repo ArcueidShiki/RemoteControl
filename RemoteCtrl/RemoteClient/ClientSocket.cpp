@@ -3,18 +3,23 @@
 
 constexpr int BUF_SIZE = 4096000;
 #define WM_SEND_PACKET (WM_USER + 1)
+#define WM_SEND_PACKET_ACK (WM_USER + 2)
 
 //define and init static member outside class
 CClientSocket* CClientSocket::m_instance = NULL;
 // help trigger delete deconstructor
 CClientSocket::CHelper CClientSocket::m_helper;
 
+enum {
+	CSM_AUTOCLOSE = 1, // Client Socket Mode
+};
+
 CClientSocket::CClientSocket()
 	: m_socket(INVALID_SOCKET)
 	, m_nIp(INADDR_ANY)
 	, m_nPort(0)
 	, m_isAutoClose(TRUE)
-	, m_hThread(INVALID_HANDLE_VALUE)
+	, m_nTid(UINT(-1))
 {
 	if (!InitSocketEnv())
 	{
@@ -39,6 +44,21 @@ CClientSocket::CClientSocket()
 			TRACE("Insert MsgHandler Failed\n");
 		}
 	}
+	// attr, manual reset, initial state, name
+	m_hEeventInvoke = CreateEvent(NULL, TRUE, FALSE, NULL);
+	m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CClientSocket::ThreadEntryMessageLoop, this, 0, &m_nTid);
+	if (m_hEeventInvoke)
+	{
+		if (WaitForSingleObject(m_hEeventInvoke, 100) == WAIT_TIMEOUT)
+		{
+			TRACE("Socket Message loop thread start failed\n");
+		}
+		CloseHandle(m_hEeventInvoke);
+	}
+	else
+	{
+		TRACE("Socket create event failed\n");
+	}
 }
 
 CClientSocket::CClientSocket(const CClientSocket& other)
@@ -55,6 +75,9 @@ CClientSocket::CClientSocket(const CClientSocket& other)
 	m_mapAutoClose = other.m_mapAutoClose;
 	m_queueSend = other.m_queueSend;
 	m_hThread = other.m_hThread;
+	m_mapMsgHandlers = other.m_mapMsgHandlers;
+	m_nTid = other.m_nTid;
+	m_hEeventInvoke = other.m_hEeventInvoke;
 }
 
 CClientSocket& CClientSocket::operator=(const CClientSocket& other)
@@ -73,12 +96,16 @@ CClientSocket& CClientSocket::operator=(const CClientSocket& other)
 		m_mapAutoClose = other.m_mapAutoClose;
 		m_queueSend = other.m_queueSend;
 		m_hThread = other.m_hThread;
+		m_mapMsgHandlers = other.m_mapMsgHandlers;
+		m_nTid = other.m_nTid;
+		m_hEeventInvoke = other.m_hEeventInvoke;
 	}
 	return *this;
 }
 
 CClientSocket::~CClientSocket()
 {
+	WaitForSingleObject(m_hThread, INFINITE);
 	closesocket(m_socket);
 	WSACleanup();
 }
@@ -93,13 +120,15 @@ CClientSocket* CClientSocket::GetInstance()
 	return m_instance;
 }
 
-void CClientSocket::ThreadEntry(void* arg)
+UINT __stdcall CClientSocket::ThreadEntryMessageLoop(void* arg)
 {
 	CClientSocket* self = (CClientSocket*)arg;
-	self->ThreadFunc();
-	_endthread();
+	self->ThreadMessageLoop();
+	_endthreadex(0);
+	return 0;
 }
 
+#if 0
 void CClientSocket::ThreadFunc()
 {
 	std::string strBuf;
@@ -171,9 +200,7 @@ void CClientSocket::ThreadFunc()
 			InitSocket();
 			m_mutex.lock();
 			m_queueSend.pop();
-			m_mapAutoClose.erase(head.hEvent);
 			m_mutex.unlock();
-			SetEvent(head.hEvent);
 		}
 		else {
 			Sleep(1);
@@ -181,9 +208,11 @@ void CClientSocket::ThreadFunc()
 	}
 	CloseSocket();
 }
+#endif
 
-void CClientSocket::MessageLoop()
+void CClientSocket::ThreadMessageLoop()
 {
+	SetEvent(m_hEeventInvoke);
 	MSG msg;
 	while (::GetMessage(&msg, NULL, 0, 0))
 	{
@@ -192,7 +221,7 @@ void CClientSocket::MessageLoop()
 		if (m_mapMsgHandlers.find(msg.message) != m_mapMsgHandlers.end())
 		{
 			(this->*m_mapMsgHandlers[msg.message])(msg.message, msg.wParam, msg.lParam);
-		}
+		} 
 	}
 }
 
@@ -206,8 +235,8 @@ void CClientSocket::ReleaseInstance()
 }
 
 /**
-* @wParam: value of cache buf
-* @lParam: len of cache buf
+* @wParam: value of cache buf (on heap)
+* @lParam: HWnd, len? this have problems
 * TODO: define MSGINFO struct (data, len, mode)
 *		define callback function(HWND, MSG)
 */
@@ -218,15 +247,62 @@ void CClientSocket::SendPacket(UINT nMsg, WPARAM wParam, LPARAM lParam)
 		TRACE("Client Socket Invalid\n");
 		return;
 	}
-	int ret = send(m_socket, (const char*)wParam, (int)lParam, 0);
-	if (ret > 0)
+	PACKET_DATA data = *(PACKET_DATA*)wParam;
+	delete (PACKET_DATA*)wParam;
+	HWND hWnd = (HWND)lParam;	// ack back to dlg wnd
+	int n_sent = send(m_socket, data.strData.c_str(), (int)data.strData.size(), 0);
+	if (n_sent > 0)
 	{
-		TRACE("Send Packet Success\n");
+		int index = 0;
+		std::string strBuf;
+		strBuf.resize(BUF_SIZE);
+		char* pBuf = const_cast<char*>(strBuf.c_str());
+		while (m_socket != INVALID_SOCKET)
+		{
+			int n_recv = recv(m_socket, pBuf + index, BUF_SIZE - index, 0);
+			if (n_recv > 0 || index > 0)
+			{
+				index += n_recv;
+				size_t n_parsed = index;
+				CPacket packet((BYTE*)pBuf, n_parsed);
+				if ((int)n_parsed > 0)
+				{
+					if (data.nMode & CSM_AUTOCLOSE)
+					{
+						::SendMessage(hWnd, WM_SEND_PACKET_ACK, (WPARAM)new CPacket(packet), NULL);
+						CloseSocket();
+						return;
+					}
+					// not auto close, continue receiving
+					char* unparse_pos = pBuf + n_parsed;
+					int n_unparse = index - (int)n_parsed;
+					if (n_unparse >= 0)
+					{
+						memmove(pBuf, unparse_pos, n_unparse);
+						// after moving, the unused spacec for receiving data
+						index = n_unparse;
+					}
+					else
+					{
+						CloseSocket();
+						::SendMessage(hWnd, WM_SEND_PACKET_ACK, NULL, 1);
+						TRACE("Server side close, Recv 0, but still can parse Packet out, has leftover in buffer, index:[%d] < n_parsed:[%d]\n", index, n_parsed);
+					}
+					::SendMessage(hWnd, WM_SEND_PACKET_ACK, (WPARAM)new CPacket(packet), NULL);
+				}
+			}
+			else
+			{
+				CloseSocket();
+				::SendMessage(hWnd, WM_SEND_PACKET_ACK, NULL, -1);
+			}
+		}
 	}
 	else
 	{
 		TRACE("Send Packet Failed\n");
 		CloseSocket();
+		::SendMessage(hWnd, WM_SEND_PACKET_ACK, NULL, -2);
 	}
 }
 
@@ -387,7 +463,7 @@ BOOL CClientSocket::Send(const CPacket& packet)
 		return FALSE;
 	}
 	std::string strOut;
-	packet.Data(strOut);
+	packet.GetData(strOut);
 	return send(m_socket, strOut.c_str(), (int)strOut.size(), 0) != SOCKET_ERROR;
 }
 
@@ -427,11 +503,26 @@ void CClientSocket::UpdateAddress(ULONG nIp, USHORT nPort)
 	m_nPort = nPort;
 }
 
+BOOL CClientSocket::SendPacket(HWND hWnd, const CPacket& packet, BOOL bAutoClose, WPARAM wParm)
+{
+	UINT nMode = bAutoClose ? CSM_AUTOCLOSE : 0;
+	std::string data;
+	packet.GetData(data);
+	PACKET_DATA* pData = new PACKET_DATA(data.c_str(), data.size(), nMode);
+	BOOL ret = PostThreadMessage(m_nTid, WM_SEND_PACKET, (WPARAM)pData, (LPARAM)hWnd); // TODO: add wParm ?
+	if (!ret)
+	{
+		delete pData;
+	}
+	return ret;
+}
+
+#if 0
 BOOL CClientSocket::SendPacket(const CPacket& packet, std::list<CPacket> *lstAcks, BOOL bAutoClose)
 {
 	if (m_socket == INVALID_SOCKET && m_hThread == INVALID_HANDLE_VALUE)
 	{
-		m_hThread = (HANDLE)_beginthread(&CClientSocket::ThreadEntry, 0, this);
+		m_hThread = (HANDLE)_beginthreadex(&CClientSocket::ThreadEntryMessageLoop, 0, this);
 	}
 	m_mutex.lock();
 	auto pair = m_mapAck.insert(std::pair<HANDLE, std::list<CPacket>*>(packet.hEvent, lstAcks)).first;
@@ -449,3 +540,4 @@ BOOL CClientSocket::SendPacket(const CPacket& packet, std::list<CPacket> *lstAck
 	}
 	return FALSE;
 }
+#endif
