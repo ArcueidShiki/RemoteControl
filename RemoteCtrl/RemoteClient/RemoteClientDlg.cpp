@@ -123,6 +123,7 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	CClientController::GetInstance()->UpdateAddress(m_server_address, static_cast<USHORT>(atoi(CW2A(m_port))));
 	m_dlgStatus.Create(IDD_DLG_STATUS, this);
 	m_dlgStatus.ShowWindow(SW_HIDE);
+	m_hTreeSelected = NULL;
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -224,16 +225,16 @@ void CRemoteClientDlg::LoadDirectory()
 	GetCursorPos(&ptMouse); // global point to screen
 	m_tree.ScreenToClient(&ptMouse); // screen to client
 	TRACE("PT mouse: x[%d] y[%d]\n", ptMouse.x, ptMouse.y);
-	HTREEITEM hTreeSelected = m_tree.HitTest(ptMouse, 0); // this translateion may make point negative
-	if (hTreeSelected == NULL)
+	m_hTreeSelected = m_tree.HitTest(ptMouse, 0); // this translateion may make point negative
+	if (m_hTreeSelected == NULL)
 	{
 		TRACE("No Item Selected\n");
 		return;
 	}
 
-	DeleteTreeChildrenItem(hTreeSelected);
+	DeleteTreeChildrenItem(m_hTreeSelected);
 	m_list.DeleteAllItems();
-	CString strPath = GetPath(hTreeSelected);
+	CString strPath = GetPath(m_hTreeSelected);
 	CT2A asciiPath(strPath);
 	const char* path = asciiPath;
 	size_t strLen = strlen(asciiPath);
@@ -241,28 +242,6 @@ void CRemoteClientDlg::LoadDirectory()
 	std::list<CPacket> lstAcks;
 	std::list<CPacket> lstPackets;
 	int nCmd = CClientController::GetInstance()->SendCommandPacket(GetSafeHwnd(), CMD_DIR, (BYTE*)path, strLen, FALSE);
-	PFILEINFO pInfo = (PFILEINFO)lstAcks.front().strData.c_str();
-	int id = 0;
-	while (pInfo->HasNext && !lstAcks.empty())
-	{
-		TRACE("Client receive file id: [%d], name: [%s] Has Next: [%d] \n", ++id, pInfo->szFileName, pInfo->HasNext);
-		if (!pInfo->IsDirectory)
-		{
-			// FILE
-			//TRACE("Insert file:%s\n", pInfo->szFileName);
-			m_list.InsertItem(0, CString(pInfo->szFileName));
-		}
-		else if (strcmp(pInfo->szFileName, ".") && strcmp(pInfo->szFileName, ".."))
-		{
-			// Directory not . or .., NORMAL Dir.
-			HTREEITEM hCur = m_tree.InsertItem(CString(pInfo->szFileName), hTreeSelected, TVI_LAST);
-			//TRACE("Insert Directory:%s\n", pInfo->szFileName);
-			m_tree.InsertItem(L"", hCur, TVI_LAST);
-		}
-		lstAcks.pop_front();
-		if (lstAcks.empty()) break;
-		pInfo = (PFILEINFO)lstAcks.front().strData.c_str();
-	}
 }
 
 void CRemoteClientDlg::LoadFiles()
@@ -387,10 +366,10 @@ void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 	CClientController::GetInstance()->StartWatchScreen();
 }
 
-void CRemoteClientDlg::GetDrivers(CPacket &packet)
+void CRemoteClientDlg::GetDrivers(CPacket &response)
 {
 
-	std::string drivers = packet.strData;
+	std::string drivers = response.strData;
 	std::string driver;
 	m_tree.DeleteAllItems();
 	for (size_t i = 0; i < drivers.size(); i++)
@@ -407,10 +386,33 @@ void CRemoteClientDlg::GetDrivers(CPacket &packet)
 	UpdateData(FALSE);
 }
 
-void CRemoteClientDlg::GetDiretories(CPacket* pPacket)
+void CRemoteClientDlg::GetFile(CPacket &response)
 {
+	PFILEINFO pInfo = (PFILEINFO)response.strData.c_str();
+	if (pInfo->HasNext)
+	{
+		TRACE("Client receive file, name: [%s] Has Next: [%d] \n", pInfo->szFileName, pInfo->HasNext);
+		if (!pInfo->IsDirectory)
+		{
+			// FILE
+			//TRACE("Insert file:%s\n", pInfo->szFileName);
+			m_list.InsertItem(0, CString(pInfo->szFileName));
+		}
+		else if (strcmp(pInfo->szFileName, ".") && strcmp(pInfo->szFileName, ".."))
+		{
+			// Directory not . or .., NORMAL Dir.
+			HTREEITEM hCur = m_tree.InsertItem(CString(pInfo->szFileName), m_hTreeSelected, TVI_LAST);
+			//TRACE("Insert Directory:%s\n", pInfo->szFileName);
+			m_tree.InsertItem(L"", hCur, TVI_LAST);
+		}
+		m_tree.Expand(m_hTreeSelected, TVE_EXPAND);
+	}
 }
 
+/**
+* @wParam: response CPacket datak
+* @lParam: hSelected handle
+*/
 LRESULT CRemoteClientDlg::OnSendPacketAck(WPARAM wParm, LPARAM lParam)
 {
 	if (lParam < 0)
@@ -424,26 +426,21 @@ LRESULT CRemoteClientDlg::OnSendPacketAck(WPARAM wParm, LPARAM lParam)
 	else
 	{
 		CPacket* pPacket = (CPacket*)wParm;
-		CPacket head;
+		CPacket response;
 		if (pPacket)
 		{
-			head = *pPacket;
+			response = *pPacket;
 			delete pPacket;
-			switch (head.sCmd)
+			switch (response.sCmd)
 			{
-			case CMD_DRIVER:
-				GetDrivers(head);
-				break;
-			case CMD_DIR:
-				break;
-			case CMD_DLD_FILE:
-				break;
-			case CMD_RUN_FILE:
-				break;
-			case CMD_DEL_FILE:
-				break;
-			default:
-				break;
+				case CMD_DRIVER: GetDrivers(response); break;
+				case CMD_DIR: GetFile(response); break;
+				case CMD_DLD_FILE:
+					break;
+				case CMD_DEL_FILE:
+					break;
+				case CMD_RUN_FILE: break;
+				default: break;
 			}
 		}
 	}

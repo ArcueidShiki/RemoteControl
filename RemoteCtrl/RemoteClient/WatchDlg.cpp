@@ -275,17 +275,11 @@ LRESULT CWatchDlg::OnSendPacketAck(WPARAM wParm, LPARAM lParam)
 			delete pPacket;
 			switch (head.sCmd)
 			{
-			case CMD_SEND_SCREEN:
-				ShowImage(head.strData);
-				break;
-			case CMD_MOUSE:
-				break;
-			case CMD_LOCK_MACHINE:
-				break;
-			case CMD_UNLOCK_MACHINE:
-				break;
-			default:
-				break;
+				case CMD_SEND_SCREEN:ShowImage(head.strData);break;
+				case CMD_MOUSE: break;
+				case CMD_LOCK_MACHINE: break;
+				case CMD_UNLOCK_MACHINE: break;
+				default: break;
 			}
 		}
 	}

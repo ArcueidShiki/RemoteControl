@@ -25,14 +25,14 @@ public:
 	afx_msg void OnDeleteFile();
 	afx_msg void OnOpenFile();
 	afx_msg void OnBnClickedBtnStartWatch();
-	afx_msg void GetDrivers(CPacket &packet);
-	afx_msg void GetDiretories(CPacket* pPacket);
+	afx_msg void GetDrivers(CPacket &response);
+	afx_msg void GetFile(CPacket &response);
 	afx_msg LRESULT OnSendPacketAck(WPARAM wParm, LPARAM lParam);
 	CListCtrl m_list;
 	CTreeCtrl m_tree;
 	CString m_port;
 	ULONG m_server_address;
-
+	HTREEITEM m_hTreeSelected;
 protected:
 	// Generated message map functions
 	virtual BOOL OnInitDialog();
