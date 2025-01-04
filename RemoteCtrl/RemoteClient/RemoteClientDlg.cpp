@@ -305,10 +305,6 @@ void CRemoteClientDlg::OnDownloadFile()
 		MessageBox(_T("Download File Failed"), _T("Download Failed"));
 		TRACE("Download Failed ret = %d\r\n", ret);
 	}
-	else
-	{
-		MessageBox(_T("Download File Success"), _T("Download Success"));
-	}
 }
 
 void CRemoteClientDlg::OnDeleteFile()
@@ -398,6 +394,36 @@ void CRemoteClientDlg::GetFile(CPacket &response)
 	}
 }
 
+void CRemoteClientDlg::DownloadFile(CPacket& response, LPARAM lParam)
+{
+	static LONGLONG length = 0, nCount = 0;
+	FILE* pFile = (FILE*)lParam;
+	if (length == 0)
+	{
+		length = *(long long*)(response.strData.c_str());
+		if (length == 0)
+		{
+			AfxMessageBox(L"File size is Zero or Download File Failed");
+			CClientController::GetInstance()->DownloadEnd();
+		}
+		// else first length packet, file size > 0
+		//TRACE("Total bytes:[%lld]\n", length);
+	}
+	else if(nCount < length)
+	{
+		fwrite(response.strData.c_str(), 1, response.strData.size(), pFile);
+		nCount += response.strData.size();
+		//TRACE("Received bytes:[%lld], total bytes:[%lld]\n", nCount, length);
+	}
+	if (nCount >= length)
+	{
+		fclose(pFile);
+		length = 0;
+		nCount = 0;
+		CClientController::GetInstance()->DownloadEnd();
+	}
+}
+
 /**
 * @wParam: response CPacket datak
 * @lParam: hSelected handle
@@ -419,12 +445,13 @@ LRESULT CRemoteClientDlg::OnSendPacketAck(WPARAM wParm, LPARAM lParam)
 		if (pPacket)
 		{
 			response = *pPacket;
+			// TODO change pointer to unique pointer or shared pointer
 			delete pPacket;
 			switch (response.sCmd)
 			{
 				case CMD_DRIVER: GetDrivers(response); break;
 				case CMD_DIR: GetFile(response); break;
-				case CMD_DLD_FILE: break; // donwload can't be done in this thread
+				case CMD_DLD_FILE: DownloadFile(response, lParam); break; // Assign to a download thread, don't block the main dlg thread
 				case CMD_DEL_FILE: LoadFiles(); break;
 				case CMD_RUN_FILE: break; // Don't need response
 				default: break;
