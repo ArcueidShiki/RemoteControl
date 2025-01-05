@@ -22,7 +22,6 @@ public:
 	void DownloadEnd();
 	void StartWatchScreen();
 	void UpdateAddress(ULONG nIp, USHORT nPort);
-	LRESULT SendMsg(MSG msg);
 	BOOL SendCommandPacket(HWND hWnd, int nCmd, BYTE* pData = NULL,
 						  size_t nLength = 0, BOOL bAutoClose = TRUE, WPARAM wParam = 0);
 protected:
@@ -33,8 +32,10 @@ protected:
 	static void ReleaseInstance();
 	void MessageLoop();
 	void ThreadWatchScreen();
+#if 0
 	LRESULT OnShowtatus(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	LRESULT OnShowWatch(UINT nMsg, WPARAM wParam, LPARAM lParam);
+#endif
 private:
 	class CHelper {
 	public:
@@ -55,7 +56,6 @@ private:
 	CWatchDlg m_watchDlg;
 	CStatusDlg m_statusDlg;
 	HANDLE m_hThread;
-	HANDLE m_hThreadDownload;
 	HANDLE m_hThreadWatch;
 	UINT m_tid;	// message loop thread id
 	static CHelper m_helper;

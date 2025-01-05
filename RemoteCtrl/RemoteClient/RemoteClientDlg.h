@@ -28,6 +28,8 @@ public:
 	afx_msg void GetDrivers(CPacket &response);
 	afx_msg void GetFile(CPacket &response);
 	afx_msg void DownloadFile(CPacket& response, LPARAM lParam);
+	afx_msg inline void InitUiData();
+	afx_msg inline void Response(CPacket &response, LPARAM lParam);
 	afx_msg LRESULT OnSendPacketAck(WPARAM wParm, LPARAM lParam);
 	CListCtrl m_list;
 	CTreeCtrl m_tree;
