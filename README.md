@@ -9,4 +9,11 @@
 7. origin/main is the "local" ref to "remote" origin main. git pull origin/main will upadte from local branch named "origin/main"; git pull origin main, will fetch first, to ensure local origin/main updated.
 
 # TODO
-Solve Concurrent Issues.
+1. Solve Concurrent Issues.
+2. Fake woken up.
+3. Using change dangerous ptr to unique_ptr, shared_ptr and weak_ptr.
+
+# Reflections:
+1. Design is much more important than functions.
+
+# Summaries:
