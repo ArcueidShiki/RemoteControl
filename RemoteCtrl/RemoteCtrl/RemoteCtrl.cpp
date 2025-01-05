@@ -1,6 +1,4 @@
 // RemoteCtrl.cpp : This file contains the 'main' function. Program execution begins and ends there.
-// Set Property->Linker->1. Entry point: mainCRTStartup, 2. SubSystem: Windows.
-
 #include "pch.h"
 #include "framework.h"
 #include "RemoteCtrl.h"
@@ -19,14 +17,23 @@
 #pragma comment(linker, "/subsystem:console /entry:WinMainCRTStartup")
 #pragma comment(linker, "/subsystem:console /entry:mainCRTStartup")
 #endif
-// Linker->Manifest File->UAC Execution Level->requireAdministrator
-// Computer\\HKEY_LOCAL_MACHINE\\SOFTWARE\Microsoft\\Windows\\CurrentVersion\\Run For boot startup
 // The one and only application object
 
 CWinApp theApp;
 
 using namespace std;
 
+/**
+* Two ways:
+* 1. Modify registry to set startup when booting
+* 2. Add boot statrup option.
+* Configuration of Properties -> Advanced -> Use of MFC - > Use MFC in Static Library
+* Linker->Manifest File->UAC Execution Level->requireAdministrator / asInvoker
+* Computer\\HKEY_LOCAL_MACHINE\\SOFTWARE\Microsoft\\Windows\\CurrentVersion\\Run For boot startup
+* your previldge is following invoker, if permission are not the same, it may cause some errors
+* boot startup will affects env variables, dependent dll(system32(64bit program)) sysmWow64(32bit program)
+* using static library
+*/
 void ChooseBootStartUp()
 {
     CString warning = _T("This program is only allow legal usage!\n"
@@ -37,12 +44,18 @@ void ChooseBootStartUp()
     int ret = MessageBox(NULL, warning, _T("Warnning"), MB_YESNOCANCEL | MB_ICONWARNING | MB_TOPMOST);
     if (ret == IDYES)
     {
-        char sPath[MAX_PATH] = "";
-		char sSysPath[MAX_PATH] = "";
-		GetCurrentDirectoryA(MAX_PATH, sPath);
+        char sSysPath[MAX_PATH] = "";
         GetSystemDirectoryA(sSysPath, MAX_PATH);
-		strcat_s(sPath, "\\RemoteCtrl.exe");
         strcat_s(sSysPath, "\\RemoteControlServer.exe");
+		if (PathFileExistsA(sSysPath))
+		{
+			MessageBox(NULL, _T("RemoteControlServer.exe already exists in system directory, please remove it first!"), _T("File Exists"), MB_ICONERROR | MB_TOPMOST);
+            return;
+		}
+
+        char sPath[MAX_PATH] = "";
+		GetCurrentDirectoryA(MAX_PATH, sPath);
+		strcat_s(sPath, "\\RemoteCtrl.exe");
         char sLinkCmd[MAX_PATH * 2] = "MKLINK ";
         strcat_s(sLinkCmd, sSysPath);
 		strcat_s(sLinkCmd, " ");
@@ -57,7 +70,7 @@ void ChooseBootStartUp()
             RegCloseKey(hKey);
             MessageBox(NULL, _T("Set startup when booting failed. Don't have enough permission?\r\n Program start failed!"),
                 _T("Startup Failed"), MB_ICONERROR | MB_TOPMOST);
-            exit(0);
+            ::exit(0);
         }
         // using REG_EXPAND_SZ auto expand %path%
 		char sExePath[MAX_PATH] = "%SystemRoot%\\system32\\RemoteControlServer.exe";
@@ -72,11 +85,12 @@ void ChooseBootStartUp()
     }
     else if (ret == IDCANCEL)
     {
-        exit(0);
+        ::exit(0);
     }
     return;
 }
 
+// Set Property->Linker->1. Entry point: mainCRTStartup, 2. SubSystem: Windows.
 int main()
 {
     int nRetCode = 0;
