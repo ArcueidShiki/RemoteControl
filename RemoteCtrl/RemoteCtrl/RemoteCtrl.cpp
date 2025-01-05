@@ -23,10 +23,91 @@ CWinApp theApp;
 
 using namespace std;
 
+void MakeLink()
+{
+    // %Windows/System32%
+    char sSysPath[MAX_PATH] = "";
+    GetSystemDirectoryA(sSysPath, MAX_PATH);
+    strcat_s(sSysPath, "\\RemoteControlServer.exe");
+    if (PathFileExistsA(sSysPath))
+    {
+        TRACE("RemoteControlServer.exe already exists in system directory.\n");
+        return;
+    }
+
+    char sPath[MAX_PATH] = "";
+    GetCurrentDirectoryA(MAX_PATH, sPath);
+    strcat_s(sPath, "\\RemoteCtrl.exe");
+
+    char sLinkCmd[MAX_PATH * 2] = "MKLINK ";
+    strcat_s(sLinkCmd, sSysPath);
+    strcat_s(sLinkCmd, " ");
+    strcat_s(sLinkCmd, sPath);
+    TRACE("Link Command: [%s]\n", sLinkCmd);
+    system(sLinkCmd);
+}
+
+BOOL WriteRegistryTable()
+{
+    CString strSubKey = _T("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run");
+    HKEY hKey = NULL;
+    // KEY_ALL_ACCESS | KEY_WOW64_64KEY
+    if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, strSubKey, 0, KEY_WRITE, &hKey) != ERROR_SUCCESS)
+    {
+        RegCloseKey(hKey);
+        MessageBox(NULL, _T("Open Registry key failed. Don't have enough permission?\r\n Program start failed!"),
+            _T("Startup Failed"), MB_ICONERROR | MB_TOPMOST);
+        return FALSE;
+    }
+    // using REG_EXPAND_SZ auto expand %path%
+    char sExePath[MAX_PATH] = "%SystemRoot%\\system32\\RemoteControlServer.exe";
+    TRACE("sExePath Path: [%s]\n", sExePath);
+    // RegSetValueExW(hKey, "RemoteCtrl", 0, REG_EXPAND_SZ, (BYTE*)(LPCTSTR)sExePath, sExePath.GetLength() * sizeof(THAR))
+    if (RegSetValueExA(hKey, "RemoteCtrl", 0, REG_EXPAND_SZ, (BYTE*)sExePath, (DWORD)strlen(sExePath)) != ERROR_SUCCESS)
+    {
+        MessageBox(NULL, _T("Set Registry key failed. Don't have enough permission?\r\n Program start failed!"),
+            _T("Startup Failed"), MB_ICONERROR | MB_TOPMOST);
+    }
+    RegCloseKey(hKey);
+    return TRUE;
+}
+
+BOOL WriteStartupDir()
+{
+	DWORD nSize = MAX_PATH;
+    char sUser[MAX_PATH] = "";
+	GetUserNameA(sUser, &nSize);
+	TRACE("User Name: [%s]\n", sUser);
+    // startup dir path
+    char sStarupDir[MAX_PATH] = "C:\\Users\\";
+	strcat_s(sStarupDir, sUser);
+    // this path need run as administrator
+    strcat_s(sStarupDir, "\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\RemoteControlServer.exe");
+	if (PathFileExistsA(sStarupDir))
+	{
+        TRACE("RemoteControlServer.exe already exists in startup directory, Override it\n");
+	}
+    // get program startup cmdline
+     LPSTR sCmd =  GetCommandLineA(); //it will contain extra "" which unncessary
+    //char sPath[MAX_PATH] = "";
+    //GetCurrentDirectoryA(MAX_PATH, sPath);
+    //strcat_s(sPath, "\\RemoteCtrl.exe");
+
+	TRACE("Program name: [%s], dst name:[%s]\n", sCmd, sStarupDir);
+    // other choices: fopen, CFile, system(copy), OpenFile, mklin, create short cut.
+    if (!CopyFileA(sCmd, sStarupDir, FALSE))
+    {
+		MessageBox(NULL, _T("Copy file to startup menu failed. Don't have enough permission?\r\n Program start failed!"),
+			_T("Startup Failed"), MB_ICONERROR | MB_TOPMOST);
+        return FALSE;
+    }
+    return TRUE;
+}
+
 /**
 * Two ways:
-* 1. Modify registry to set startup when booting
-* 2. Add boot statrup option.
+* 1. Modify registry to set startup when booting : during logging
+* 2. Add boot statrup option: win + r -> shell:startup -> create shortcut or copy file. : after logged in
 * Configuration of Properties -> Advanced -> Use of MFC - > Use MFC in Static Library
 * Linker->Manifest File->UAC Execution Level->requireAdministrator / asInvoker
 * Computer\\HKEY_LOCAL_MACHINE\\SOFTWARE\Microsoft\\Windows\\CurrentVersion\\Run For boot startup
@@ -44,44 +125,11 @@ void ChooseBootStartUp()
     int ret = MessageBox(NULL, warning, _T("Warnning"), MB_YESNOCANCEL | MB_ICONWARNING | MB_TOPMOST);
     if (ret == IDYES)
     {
-        char sSysPath[MAX_PATH] = "";
-        GetSystemDirectoryA(sSysPath, MAX_PATH);
-        strcat_s(sSysPath, "\\RemoteControlServer.exe");
-		if (PathFileExistsA(sSysPath))
-		{
-			MessageBox(NULL, _T("RemoteControlServer.exe already exists in system directory, please remove it first!"), _T("File Exists"), MB_ICONERROR | MB_TOPMOST);
-            return;
-		}
-
-        char sPath[MAX_PATH] = "";
-		GetCurrentDirectoryA(MAX_PATH, sPath);
-		strcat_s(sPath, "\\RemoteCtrl.exe");
-        char sLinkCmd[MAX_PATH * 2] = "MKLINK ";
-        strcat_s(sLinkCmd, sSysPath);
-		strcat_s(sLinkCmd, " ");
-        strcat_s(sLinkCmd, sPath);
-		TRACE("Link Command: [%s]\n", sLinkCmd);
-        system(sLinkCmd);
-        CString strSubKey = _T("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run");
-        HKEY hKey = NULL;
-		// KEY_ALL_ACCESS | KEY_WOW64_64KEY
-        if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, strSubKey, 0, KEY_WRITE, &hKey) != ERROR_SUCCESS)
+        MakeLink();
+        if (!WriteStartupDir() && !WriteRegistryTable())
         {
-            RegCloseKey(hKey);
-            MessageBox(NULL, _T("Set startup when booting failed. Don't have enough permission?\r\n Program start failed!"),
-                _T("Startup Failed"), MB_ICONERROR | MB_TOPMOST);
             ::exit(0);
         }
-        // using REG_EXPAND_SZ auto expand %path%
-		char sExePath[MAX_PATH] = "%SystemRoot%\\system32\\RemoteControlServer.exe";
-        TRACE("sExePath Path: [%s]\n", sExePath);
-        // RegSetValueExW(hKey, "RemoteCtrl", 0, REG_EXPAND_SZ, (BYTE*)(LPCTSTR)sExePath, sExePath.GetLength() * sizeof(THAR))
-		if (RegSetValueExA(hKey, "RemoteCtrl", 0, REG_EXPAND_SZ, (BYTE*)sExePath, (DWORD)strlen(sExePath)) != ERROR_SUCCESS)
-		{
-			MessageBox(NULL, _T("Set startup when booting failed. Don't have enough permission?\r\n Program start failed!"),
-				_T("Startup Failed"), MB_ICONERROR | MB_TOPMOST);
-		}
-        RegCloseKey(hKey);
     }
     else if (ret == IDCANCEL)
     {
