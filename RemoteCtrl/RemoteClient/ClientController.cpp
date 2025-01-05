@@ -24,7 +24,6 @@ CClientController::CClientController()
 	m_remotePath = new char[MAX_PATH];
 	m_tid = UINT(-1);
 	m_hThread = INVALID_HANDLE_VALUE;
-	m_hThreadWatch = INVALID_HANDLE_VALUE;
 	m_isWatchDlgClosed = TRUE;
 }
 
