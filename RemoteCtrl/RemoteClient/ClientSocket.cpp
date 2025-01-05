@@ -250,7 +250,6 @@ void CClientSocket::SendPacket(UINT nMsg, WPARAM wParam, LPARAM lParam)
 	PACKET_DATA data = *(PACKET_DATA*)wParam;
 	delete (PACKET_DATA*)wParam;
 	HWND hWnd = (HWND)lParam;	// ack back to dlg wnd
-	// TODO data.wParam = pFile
 	int n_sent = send(m_socket, data.strData.c_str(), (int)data.strData.size(), 0);
 	if (n_sent > 0)
 	{
@@ -516,28 +515,3 @@ BOOL CClientSocket::SendPacket(HWND hWnd, const CPacket& packet, BOOL bAutoClose
 	}
 	return ret;
 }
-
-#if 0
-BOOL CClientSocket::SendPacket(const CPacket& packet, std::list<CPacket> *lstAcks, BOOL bAutoClose)
-{
-	if (m_socket == INVALID_SOCKET && m_hThread == INVALID_HANDLE_VALUE)
-	{
-		m_hThread = (HANDLE)_beginthreadex(&CClientSocket::ThreadEntryMessageLoop, 0, this);
-	}
-	m_mutex.lock();
-	auto pair = m_mapAck.insert(std::pair<HANDLE, std::list<CPacket>*>(packet.hEvent, lstAcks)).first;
-	m_mapAutoClose.insert(std::pair<HANDLE, BOOL>(packet.hEvent, bAutoClose));
-	m_queueSend.push(packet);
-	m_mutex.unlock();
-	WaitForSingleObject(packet.hEvent, INFINITE);
-	auto it = m_mapAck.find(packet.hEvent);
-	if (it != m_mapAck.end())
-	{
-		m_mutex.lock();
-		m_mapAck.erase(it);
-		m_mutex.unlock();
-		return TRUE;
-	}
-	return FALSE;
-}
-#endif

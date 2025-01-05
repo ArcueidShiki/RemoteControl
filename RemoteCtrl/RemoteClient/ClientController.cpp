@@ -24,7 +24,6 @@ CClientController::CClientController()
 	m_remotePath = new char[MAX_PATH];
 	m_tid = UINT(-1);
 	m_hThread = INVALID_HANDLE_VALUE;
-	m_hThreadDownload = INVALID_HANDLE_VALUE;
 	m_hThreadWatch = INVALID_HANDLE_VALUE;
 	m_isWatchDlgClosed = TRUE;
 }
@@ -38,8 +37,8 @@ int CClientController::InitController()
 		UINT nMsg;
 		MSGFUNC func;
 	} MsgFuncs[] = {
-		{WM_SEND_STATUS, &CClientController::OnShowtatus},
-		{WM_SEND_WATCH, &CClientController::OnShowWatch},
+		//{WM_SEND_STATUS, &CClientController::OnShowtatus},
+		//{WM_SEND_WATCH, &CClientController::OnShowWatch},
 		{WM_SEND_MESSAGE, NULL/*TODO*/},
 		{UINT(-1), NULL}
 	};
@@ -84,25 +83,6 @@ CClientController::~CClientController()
 		delete[] m_remotePath;
 		m_remotePath = NULL;
 	}
-}
-
-/**
-* @msg: UINT nMsg Code: for cmd code
-* @wParam: WPARAM autoclose?
-*/
-LRESULT CClientController::SendMsg(MSG msg)
-{
-	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (!hEvent) return -2;
-	// nMsg code(cmd) + result code
-	MSGINFO info(msg);
-	// tid, message code, msginfo(msg code + ret), event
-	PostThreadMessage(m_tid, WM_SEND_MESSAGE, (WPARAM)&info, (LPARAM)hEvent);
-	// hEvent Setted represent handle message finished.
-	// Wait for hEvent be signaled.
-	WaitForSingleObject(hEvent, INFINITE);
-	CloseHandle(hEvent);
-	return info.result;
 }
 
 void CClientController::UpdateAddress(ULONG nIp, USHORT nPort)
@@ -275,6 +255,7 @@ void __stdcall CClientController::ThreadWatchScreenEntry(void* arg)
 	_endthread();
 }
 
+#if 0
 LRESULT CClientController::OnShowtatus(UINT nMsg, WPARAM wParam, LPARAM lParam)
 {
 	return m_statusDlg.ShowWindow(SW_SHOW);
@@ -284,6 +265,7 @@ LRESULT CClientController::OnShowWatch(UINT nMsg, WPARAM wParam, LPARAM lParam)
 {
 	return m_watchDlg.DoModal();
 }
+#endif
 
 CClientController::CHelper::CHelper()
 {

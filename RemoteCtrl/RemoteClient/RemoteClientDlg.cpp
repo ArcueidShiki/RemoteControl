@@ -115,15 +115,7 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	//  when the application's main window is not a dialog
 	SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
-
-	UpdateData();
-	m_port = _T("20000");
-	m_server_address = 0xC0A8027B; // 192.169.2.123:0xC0A8027B, 127.0.0.1:0x7F000001 If using virtual box, set network mode to bridge.
-	UpdateData(FALSE);
-	CClientController::GetInstance()->UpdateAddress(m_server_address, static_cast<USHORT>(atoi(CW2A(m_port))));
-	m_dlgStatus.Create(IDD_DLG_STATUS, this);
-	m_dlgStatus.ShowWindow(SW_HIDE);
-	m_hTreeSelected = NULL;
+	InitUiData();
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -323,6 +315,10 @@ void CRemoteClientDlg::OnDeleteFile()
 		AfxMessageBox(L"Delete File Failed");
 		TRACE("Delete File Failed, ret = %d\n", ret);
 	}
+	else
+	{
+		MessageBox(L"Delete File Success", L"Delete File", MB_ICONINFORMATION);
+	}
 }
 
 
@@ -424,6 +420,32 @@ void CRemoteClientDlg::DownloadFile(CPacket& response, LPARAM lParam)
 	}
 }
 
+void CRemoteClientDlg::InitUiData()
+{
+	UpdateData();
+	m_port = _T("20000");
+	// 192.169.2.123:0xC0A8027B, 127.0.0.1:0x7F000001 If using virtual box, set network mode to bridge.
+	m_server_address = 0xC0A8027B;
+	UpdateData(FALSE);
+	CClientController::GetInstance()->UpdateAddress(m_server_address, static_cast<USHORT>(atoi(CW2A(m_port))));
+	m_dlgStatus.Create(IDD_DLG_STATUS, this);
+	m_dlgStatus.ShowWindow(SW_HIDE);
+	m_hTreeSelected = NULL;
+}
+
+void CRemoteClientDlg::Response(CPacket &response, LPARAM lParam)
+{
+	switch (response.sCmd)
+	{
+		case CMD_DRIVER: GetDrivers(response); break;
+		case CMD_DIR: GetFile(response); break;
+		case CMD_DLD_FILE: DownloadFile(response, lParam); break; // Assign to a download thread, don't block the main dlg thread
+		case CMD_DEL_FILE: LoadFiles(); break;
+		case CMD_RUN_FILE: break; // Don't need response
+		default: break;
+	}
+}
+
 /**
 * @wParam: response CPacket datak
 * @lParam: hSelected handle
@@ -444,18 +466,10 @@ LRESULT CRemoteClientDlg::OnSendPacketAck(WPARAM wParm, LPARAM lParam)
 		CPacket response;
 		if (pPacket)
 		{
-			response = *pPacket;
 			// TODO change pointer to unique pointer or shared pointer
+			response = *pPacket;
 			delete pPacket;
-			switch (response.sCmd)
-			{
-				case CMD_DRIVER: GetDrivers(response); break;
-				case CMD_DIR: GetFile(response); break;
-				case CMD_DLD_FILE: DownloadFile(response, lParam); break; // Assign to a download thread, don't block the main dlg thread
-				case CMD_DEL_FILE: LoadFiles(); break;
-				case CMD_RUN_FILE: break; // Don't need response
-				default: break;
-			}
+			Response(response, lParam);
 		}
 	}
 	return 0;
