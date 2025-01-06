@@ -140,13 +140,14 @@ void ChooseBootStartUp()
 
 void ShowError()
 {
-    LPVOID lpMessageBuf = NULL;
+    LPSTR lpMessageBuf = NULL;
     // strerror(errno); // standard C library
-    FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+    FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
                   NULL, GetLastError(), // GetLastError is thread related
                   MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                  (LPWSTR)&lpMessageBuf, 0, NULL);
-    OutputDebugStringA((LPCSTR)lpMessageBuf);
+                  (LPSTR)&lpMessageBuf, 0, NULL);
+    OutputDebugStringA(lpMessageBuf);
+	MessageBoxA(NULL, lpMessageBuf, "Error", MB_OK | MB_ICONERROR);
     LocalFree(lpMessageBuf);
 }
 
@@ -156,6 +157,7 @@ BOOL IsAdmin()
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken))
     {
         ShowError();
+        CloseHandle(hToken);
         return FALSE;
     }
     TOKEN_ELEVATION elevation;
@@ -164,6 +166,7 @@ BOOL IsAdmin()
     if (!GetTokenInformation(hToken, TokenElevation, &elevation, sizeof(elevation), &len))
     {
         ShowError();
+        CloseHandle(hToken);
         return FALSE;
     }
     CloseHandle(hToken);
@@ -175,19 +178,52 @@ BOOL IsAdmin()
     return FALSE;
 }
 
+void RunAsAdmin()
+{
+    HANDLE hToken = NULL;
+	// cmd->secpol.msc->Local Policies->Security Options->
+    // Accounts: Administrator account status -> Enable
+	// Accounts: Limit local account use of blank passwords to console logon only -> Disable
+	// win + x -> cmd(admin) -> net user Administrator *: set password to blank
+    // LOGON32_LOGON_BATCH
+    if (!LogonUser(L"Administrator", NULL, NULL, LOGON32_LOGON_INTERACTIVE, LOGON32_PROVIDER_DEFAULT, &hToken))
+    {
+        ShowError();
+        MessageBox(NULL, _T("Logon administrator Failed!"), NULL, MB_ICONERROR | MB_TOPMOST);
+        CloseHandle(hToken);
+        ::exit(0);
+    }
+    //MessageBox(NULL, _T("Logon Administrator Success"), NULL, MB_ICONINFORMATION | MB_TOPMOST);
+
+    STARTUPINFO si = { 0 };
+    PROCESS_INFORMATION pi = { 0 };
+    TCHAR sPath[MAX_PATH] = _T("");
+    GetCurrentDirectory(MAX_PATH, sPath);
+    CString strCmd = sPath;
+    strCmd += _T("\\RemoteCtrl.exe");
+    if (!CreateProcessWithLogonW(_T("Administrator"), NULL, NULL, LOGON_WITH_PROFILE, NULL, strCmd.GetBuffer(), CREATE_UNICODE_ENVIRONMENT, NULL, NULL, &si, &pi))
+    {
+		ShowError(); // A required privilege is not held by the client
+		MessageBox(NULL, _T("Create process failed"), NULL, MB_ICONERROR | MB_TOPMOST);
+        CloseHandle(hToken);
+		::exit(0);
+    }
+    WaitForSingleObject(pi.hThread, INFINITE);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+	CloseHandle(hToken);
+}
+
 // Set Property->Linker->1. Entry point: mainCRTStartup, 2. SubSystem: Windows.
 int main()
 {
-	if (!IsAdmin())
-	{
-		MessageBox(NULL, _T("This program must run as administrator!"), _T("Permission Denied"), MB_ICONERROR | MB_TOPMOST);
-		return 0;
-	}
-    else
-    {
-        TRACE("This program is running as administrator!");
-    }
     int nRetCode = 0;
+	if (!IsAdmin())
+    {
+        RunAsAdmin();
+		MessageBox(NULL, _T("Run as administrator success!"), _T("Permission Granted"), MB_ICONINFORMATION | MB_TOPMOST);
+        return nRetCode;
+    }
 
     HMODULE hModule = ::GetModuleHandle(nullptr);
 
