@@ -7,6 +7,7 @@
 #include "Utils.h"
 #include "Command.h"
 #include <conio.h>
+#include "Queue.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -24,7 +25,7 @@ CWinApp theApp;
 
 using namespace std;
 
-#if 1
+#if 0
 // IOCP
 enum {
     IocpListEmpty,
@@ -122,6 +123,30 @@ int main()
     {
         return 1;
     }
+    CQueue<std::string> lstString;
+    ULONGLONG tick = GetTickCount64();
+    ULONGLONG tick1 = GetTickCount64();
+    while (_kbhit() == 0)
+    {
+        if (GetTickCount64() - tick > 1300)
+        {
+            // separate request and response
+			lstString.PushBack("hello push\r\n");
+            tick = GetTickCount64();
+        }
+        if (GetTickCount64() - tick1 > 2000)
+        {
+            std::string str;
+			lstString.PopFront(str);
+			printf("pop from list:%s\r\n", str.c_str());
+            tick1 = GetTickCount64();
+        }
+        Sleep(1);
+    }
+	printf("Size: %zu\n", lstString.Size());
+    lstString.Clear();
+    printf("Cleared, Size: %zu\n", lstString.Size());
+#if 0
     HANDLE hIOCP = INVALID_HANDLE_VALUE;
     // HANDLE: socket, file, serial port
 	// epoll is single thread, IOCP allows multi-thread
@@ -154,6 +179,8 @@ int main()
         CloseHandle(hIOCP);
     }
     printf("exit\n");
+#endif
+
 #if 0
     if (!CUtils::ChooseBootStartUp())
     {
