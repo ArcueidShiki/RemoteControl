@@ -228,4 +228,5 @@ BOOL CUtils::Init()
         wprintf(L"Fatal Error: MFC initialization failed\n");
         return FALSE;
     }
+    return TRUE;
 }
