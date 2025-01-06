@@ -31,6 +31,20 @@ enum {
 	IocpListPush,
 	IocpListPop,
 };
+
+void Func(void* arg)
+{
+    std::string* pstr = (std::string*)arg;
+    if (pstr->empty())
+    {
+        printf("List is empty. no data\r\n");
+    }
+    else
+    {
+        printf("pop from list:%s\r", pstr->c_str());
+    }
+}
+
 typedef struct IocpParam
 {
     int nOpt;
@@ -38,33 +52,22 @@ typedef struct IocpParam
     _beginthread_proc_type cbFunc;
 	IocpParam(int nOpt, const std::string& strData,
               _beginthread_proc_type cbFunc = NULL)
-        : nOpt(nOpt), strData(strData) {}
+        : nOpt(nOpt), strData(strData)
+    {
+        this->cbFunc = cbFunc;
+    }
     IocpParam() {}
 } IOCP_PARAM;
 
-void Func(void* arg)
-{
-	std::string *pstr = (std::string*)arg;
-    if (pstr != NULL)
-    {
-        printf("pop from list:%s\r", pstr->c_str());
-        delete pstr;
-    }
-    else
-    {
-        printf("List is empty. no data\r\n");
-    }
 
-}
-
-void ThreadQueueEntry(HANDLE hIOCP)
+void ThreadMain(HANDLE hIOCP)
 {
     std::list<std::string> lstString;
     DWORD dwTransferred = 0;
     ULONG_PTR CompletionKey = 0;
     OVERLAPPED Overlapped = { 0 };
-	LPOVERLAPPED pOverlapped = &Overlapped;
-	// wait for iocp to be signaled, otherwise sleep
+    LPOVERLAPPED pOverlapped = &Overlapped;
+    // wait for iocp to be signaled, otherwise sleep
     while (GetQueuedCompletionStatus(hIOCP, &dwTransferred, &CompletionKey, &pOverlapped, INFINITE))
     {
         if (dwTransferred == 0 || CompletionKey == 0)
@@ -72,31 +75,37 @@ void ThreadQueueEntry(HANDLE hIOCP)
             printf("Thread is prepare to exit\n");
             break;
         }
-		IOCP_PARAM* pParam = (IOCP_PARAM*)CompletionKey;
-		if (pParam->nOpt == IocpListPush)
-		{
-			lstString.push_back(pParam->strData);
-		}
-		else if (pParam->nOpt == IocpListPop)
-		{
-            std::string* pstr = NULL;
-			if (!lstString.empty())
-			{
-                pstr = new std::string(lstString.front());
-				lstString.pop_front();
-                if (pParam->cbFunc)
-                {
-					pParam->cbFunc(pstr);
-                }
-			}
-		}
+        IOCP_PARAM* pParam = (IOCP_PARAM*)CompletionKey;
+        if (pParam->nOpt == IocpListPush)
+        {
+            lstString.push_back(pParam->strData);
+        }
+        else if (pParam->nOpt == IocpListPop)
+        {
+            std::string str = "";
+            if (!lstString.empty())
+            {
+                str = lstString.front();
+                lstString.pop_front();
+            }
+            if (pParam->cbFunc)
+            {
+                pParam->cbFunc(&str);
+            }
+        }
         else
         {
             lstString.clear();
         }
-		delete pParam;
+        delete pParam;
     }
-    _endthread();
+    lstString.clear();
+}
+
+void ThreadQueueEntry(HANDLE hIOCP)
+{
+    ThreadMain(hIOCP);
+	_endthread(); // may cause local variable to unable to destroyed leading to memory leak
 }
 #endif
 
@@ -120,22 +129,23 @@ int main()
     // put IOCP into a thread,
     HANDLE hThread = (HANDLE)_beginthread(ThreadQueueEntry, 0, hIOCP);
 	ULONGLONG tick = GetTickCount64();
+	ULONGLONG tick1 = GetTickCount64();
 
     if (hIOCP != NULL)
     {
         // INVOKE 
-        while (_kbhit() != 0)
+        while (_kbhit() == 0)
         {
             if (GetTickCount64() - tick > 1300)
             {
 				// separate request and response
-                PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPop, "hello"), NULL);
+                PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPop, "Msg pop\r\n", &Func), NULL);
                 tick = GetTickCount64();
             }
-            if (GetTickCount64() - tick > 2000)
+            if (GetTickCount64() - tick1 > 2000)
             {
-                PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPush, "hello", &Func), NULL);
-                tick = GetTickCount64();
+                PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPush, "hello Pushed\r\n"), NULL);
+                tick1 = GetTickCount64();
             }
             Sleep(1);
         }
