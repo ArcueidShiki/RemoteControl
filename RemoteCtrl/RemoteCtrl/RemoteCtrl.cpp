@@ -138,9 +138,55 @@ void ChooseBootStartUp()
     return;
 }
 
+void ShowError()
+{
+    LPVOID lpMessageBuf = NULL;
+    // strerror(errno); // standard C library
+    FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+                  NULL, GetLastError(), // GetLastError is thread related
+                  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                  (LPWSTR)&lpMessageBuf, 0, NULL);
+    OutputDebugStringA((LPCSTR)lpMessageBuf);
+    LocalFree(lpMessageBuf);
+}
+
+BOOL IsAdmin()
+{
+    HANDLE hToken = NULL;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken))
+    {
+        ShowError();
+        return FALSE;
+    }
+    TOKEN_ELEVATION elevation;
+	memset(&elevation, 0, sizeof(elevation));
+    DWORD len = 0;
+    if (!GetTokenInformation(hToken, TokenElevation, &elevation, sizeof(elevation), &len))
+    {
+        ShowError();
+        return FALSE;
+    }
+    CloseHandle(hToken);
+    if (len == sizeof(elevation))
+    {
+        return elevation.TokenIsElevated;
+    }
+    TRACE("Length of token information is %d\r\n", len);
+    return FALSE;
+}
+
 // Set Property->Linker->1. Entry point: mainCRTStartup, 2. SubSystem: Windows.
 int main()
 {
+	if (!IsAdmin())
+	{
+		MessageBox(NULL, _T("This program must run as administrator!"), _T("Permission Denied"), MB_ICONERROR | MB_TOPMOST);
+		return 0;
+	}
+    else
+    {
+        TRACE("This program is running as administrator!");
+    }
     int nRetCode = 0;
 
     HMODULE hModule = ::GetModuleHandle(nullptr);
