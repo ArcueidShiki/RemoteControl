@@ -6,6 +6,7 @@
 #include "LockDialog.h"
 #include "Utils.h"
 #include "Command.h"
+#include <conio.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -23,17 +24,127 @@ CWinApp theApp;
 
 using namespace std;
 
+#if 1
+// IOCP
+enum {
+    IocpListEmpty,
+	IocpListPush,
+	IocpListPop,
+};
+typedef struct IocpParam
+{
+    int nOpt;
+    std::string strData;
+    _beginthread_proc_type cbFunc;
+	IocpParam(int nOpt, const std::string& strData,
+              _beginthread_proc_type cbFunc = NULL)
+        : nOpt(nOpt), strData(strData) {}
+    IocpParam() {}
+} IOCP_PARAM;
+
+void Func(void* arg)
+{
+	std::string *pstr = (std::string*)arg;
+    if (pstr != NULL)
+    {
+        printf("pop from list:%s\r", pstr->c_str());
+        delete pstr;
+    }
+    else
+    {
+        printf("List is empty. no data\r\n");
+    }
+
+}
+
+void ThreadQueueEntry(HANDLE hIOCP)
+{
+    std::list<std::string> lstString;
+    DWORD dwTransferred = 0;
+    ULONG_PTR CompletionKey = 0;
+    OVERLAPPED Overlapped = { 0 };
+	LPOVERLAPPED pOverlapped = &Overlapped;
+	// wait for iocp to be signaled, otherwise sleep
+    while (GetQueuedCompletionStatus(hIOCP, &dwTransferred, &CompletionKey, &pOverlapped, INFINITE))
+    {
+        if (dwTransferred == 0 || CompletionKey == 0)
+        {
+            printf("Thread is prepare to exit\n");
+            break;
+        }
+		IOCP_PARAM* pParam = (IOCP_PARAM*)CompletionKey;
+		if (pParam->nOpt == IocpListPush)
+		{
+			lstString.push_back(pParam->strData);
+		}
+		else if (pParam->nOpt == IocpListPop)
+		{
+            std::string* pstr = NULL;
+			if (!lstString.empty())
+			{
+                pstr = new std::string(lstString.front());
+				lstString.pop_front();
+                if (pParam->cbFunc)
+                {
+					pParam->cbFunc(pstr);
+                }
+			}
+		}
+        else
+        {
+            lstString.clear();
+        }
+		delete pParam;
+    }
+    _endthread();
+}
+#endif
+
 // Set Property->Linker->1. Entry point: mainCRTStartup, 2. SubSystem: Windows.
 int main()
 {
+#if 0
     if (!CUtils::IsAdmin())
     {
         return CUtils::RunAsAdmin() ? 0 : 1;
     }
+#endif
     if (!CUtils::Init())
     {
         return 1;
     }
+    HANDLE hIOCP = INVALID_HANDLE_VALUE;
+    // HANDLE: socket, file, serial port
+	// epoll is single thread, IOCP allows multi-thread
+    hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);
+    // put IOCP into a thread,
+    HANDLE hThread = (HANDLE)_beginthread(ThreadQueueEntry, 0, hIOCP);
+	ULONGLONG tick = GetTickCount64();
+
+    if (hIOCP != NULL)
+    {
+        // INVOKE 
+        while (_kbhit() != 0)
+        {
+            if (GetTickCount64() - tick > 1300)
+            {
+				// separate request and response
+                PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPop, "hello"), NULL);
+                tick = GetTickCount64();
+            }
+            if (GetTickCount64() - tick > 2000)
+            {
+                PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPush, "hello", &Func), NULL);
+                tick = GetTickCount64();
+            }
+            Sleep(1);
+        }
+        PostQueuedCompletionStatus(hIOCP, 0, NULL, NULL);
+        WaitForSingleObject(hThread, INFINITE);
+        CloseHandle(hIOCP);
+    }
+    printf("exit\n");
+#if 0
     if (!CUtils::ChooseBootStartUp())
     {
         return 1;
@@ -48,5 +159,6 @@ int main()
             MessageBox(NULL, _T("Cannot accept user, failed many time, program exit"), _T("Accept Client Failed!"), MB_OK | MB_ICONERROR);
             break;
     }
+#endif
     return 0;
 }
