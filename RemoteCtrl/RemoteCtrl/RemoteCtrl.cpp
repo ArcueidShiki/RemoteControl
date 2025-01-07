@@ -8,6 +8,7 @@
 #include "Command.h"
 #include <conio.h>
 #include "Queue.h"
+#include <MSWSock.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -139,6 +140,90 @@ void test()
     printf("Cleared, Size: %zu\n", lstString.Size());
 }
 
+class COverlapped
+{
+public:
+    OVERLAPPED m_overlapped;
+    DWORD m_operator;
+    char m_buffer[4096];
+    COverlapped()
+    {
+        m_operator = 0;
+		memset(&m_overlapped, 0, sizeof(m_overlapped));
+		memset(m_buffer, 0, sizeof(m_buffer));
+    }
+};
+
+void iocp()
+{
+    //SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
+    // NONBLOCK socket
+    SOCKET sock = WSASocketW(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+    if (sock == INVALID_SOCKET)
+    {
+        CUtils::ShowError();
+        return;
+    }
+    HANDLE hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, sock, 4);
+    if (hIOCP == NULL)
+    {
+        CUtils::ShowError();
+        return;
+    }
+    SOCKADDR_IN addr = {};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+    addr.sin_port = htons(20000);
+    bind(sock, (SOCKADDR*)&addr, sizeof(addr));
+	listen(sock, 5);
+
+    SOCKET client = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+    if (client == INVALID_SOCKET)
+    {
+        CUtils::ShowError();
+        return;
+    }
+    // bind socket to IOCP
+    CreateIoCompletionPort((HANDLE)sock, hIOCP, 0, 0);
+
+    COverlapped overlapped;
+    overlapped.m_operator = 1;
+    DWORD received = 0;
+    // build connection immediately
+    // AcceptEx(sock, client, buffer, 0, sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16, &received, &overlapped)
+
+    // build connection when buffer is full to avoid network sniffing
+	// async accept
+    if (!AcceptEx(sock, client, overlapped.m_buffer, sizeof(overlapped.m_buffer) - 32,
+                  sizeof(SOCKADDR_IN), sizeof(SOCKADDR_IN), &received, &overlapped.m_overlapped))
+    {
+        CUtils::ShowError();
+        return;
+    }
+
+    // Start a new thread receive data
+    // this typically only afford for send and recevie
+    // dispatch heavy tasks to other servers, for load balance.
+    while (TRUE)
+    {
+        LPOVERLAPPED pOverlapped = NULL;
+        DWORD dwTransferred = 0;
+        ULONG_PTR key = 0;
+        if (GetQueuedCompletionStatus(hIOCP, &dwTransferred, &key, &pOverlapped, INFINITE))
+        {
+            COverlapped* pO = CONTAINING_RECORD(pOverlapped, COverlapped, m_overlapped);
+            switch (pO->m_operator)
+            {
+            case 1:
+                WSASend();
+                WSARecv();
+            }
+        }
+    }
+
+
+}
+
 // Set Property->Linker->1. Entry point: mainCRTStartup, 2. SubSystem: Windows.
 int main()
 {
@@ -152,10 +237,8 @@ int main()
     {
         return 1;
     }
-    for (int i = 0; i < 10; i++)
-    {
-        test();
-    }
+
+    iocp();
 
 #if 0
     HANDLE hIOCP = INVALID_HANDLE_VALUE;
