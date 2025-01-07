@@ -110,6 +110,35 @@ void ThreadQueueEntry(HANDLE hIOCP)
 }
 #endif
 
+void test()
+{
+    CQueue<std::string> lstString;
+    ULONGLONG tick = GetTickCount64();
+    ULONGLONG tick1 = GetTickCount64();
+    ULONGLONG total = GetTickCount64();
+    //while (_kbhit() == 0)
+    while (GetTickCount64() - total < 1000)
+    {
+        if (GetTickCount64() - tick > 13)
+        {
+            // separate request and response
+            lstString.PushBack("Item");
+            tick = GetTickCount64();
+        }
+        if (GetTickCount64() - tick1 > 20)
+        {
+            std::string str;
+            lstString.PopFront(str);
+            printf("pop from list:%s\r\n", str.c_str());
+            tick1 = GetTickCount64();
+        }
+        Sleep(1);
+    }
+    printf("Size: %zu\n", lstString.Size());
+    lstString.Clear();
+    printf("Cleared, Size: %zu\n", lstString.Size());
+}
+
 // Set Property->Linker->1. Entry point: mainCRTStartup, 2. SubSystem: Windows.
 int main()
 {
@@ -123,29 +152,11 @@ int main()
     {
         return 1;
     }
-    CQueue<std::string> lstString;
-    ULONGLONG tick = GetTickCount64();
-    ULONGLONG tick1 = GetTickCount64();
-    while (_kbhit() == 0)
+    for (int i = 0; i < 10; i++)
     {
-        if (GetTickCount64() - tick > 1300)
-        {
-            // separate request and response
-			lstString.PushBack("hello push\r\n");
-            tick = GetTickCount64();
-        }
-        if (GetTickCount64() - tick1 > 2000)
-        {
-            std::string str;
-			lstString.PopFront(str);
-			printf("pop from list:%s\r\n", str.c_str());
-            tick1 = GetTickCount64();
-        }
-        Sleep(1);
+        test();
     }
-	printf("Size: %zu\n", lstString.Size());
-    lstString.Clear();
-    printf("Cleared, Size: %zu\n", lstString.Size());
+
 #if 0
     HANDLE hIOCP = INVALID_HANDLE_VALUE;
     // HANDLE: socket, file, serial port

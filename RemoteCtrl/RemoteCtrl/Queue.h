@@ -56,7 +56,7 @@ inline CQueue<T>::CQueue()
 	m_hCompletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);
 	if (m_hCompletionPort != NULL)
 	{
-		m_hThread = (HANDLE)_beginthread(&CQueue<T>::ThreadEntry, 0, m_hCompletionPort);
+		m_hThread = (HANDLE)_beginthread(&CQueue<T>::ThreadEntry, 0, this);
 	}
 }
 
@@ -68,11 +68,16 @@ inline CQueue<T>::~CQueue()
 		return;
 	}
 	m_lock.exchange(TRUE);
-	HANDLE hTmp = m_hCompletionPort;
+	// notify thread to exit
 	PostQueuedCompletionStatus(m_hCompletionPort, 0, NULL, NULL);
+	// wait for thread exit
 	WaitForSingleObject(m_hThread, INFINITE);
-	m_hCompletionPort = NULL;
-	CloseHandle(hTmp);
+	if (m_hCompletionPort != NULL)
+	{
+		HANDLE hTmp = m_hCompletionPort;
+		m_hCompletionPort = NULL;
+		CloseHandle(hTmp);
+	}
 	m_lstData.clear();
 }
 
@@ -140,9 +145,21 @@ inline size_t CQueue<T>::Size()
 template<class T>
 inline BOOL CQueue<T>::Clear()
 {
-	if (m_lock.load()) return FALSE;
-	PPARAM pParam(QCLEAR, T());
-	return !PostQueuedCompletionStatus(m_hCompletionPort, sizeof(PPARAM), (ULONG_PTR)&pParam, NULL);
+	if (m_lock.load())
+	{
+		return FALSE;
+	}
+	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	PPARAM pParam(QCLEAR, T(), hEvent);
+	BOOL ret = PostQueuedCompletionStatus(m_hCompletionPort, sizeof(PPARAM), (ULONG_PTR)&pParam, NULL);
+	if (!ret)
+	{
+		CloseHandle(hEvent);
+		return FALSE;
+	}
+	ret = WaitForSingleObject(hEvent, INFINITE) == WAIT_OBJECT_0;
+	CloseHandle(hEvent);
+	return ret;
 }
 
 template<class T>
@@ -182,6 +199,7 @@ inline void CQueue<T>::ThreadMain()
 		DealParam(pParam);
 	}
 	CloseHandle(m_hCompletionPort);
+	m_hCompletionPort = NULL;
 }
 
 template<class T>
@@ -207,6 +225,7 @@ inline void CQueue<T>::DealParam(PPARAM* pParam)
 		break;
 	case QCLEAR:
 		m_lstData.clear();
+		if (pParam->hEvent) SetEvent(pParam->hEvent);
 		break;
 	default:
 		OutputDebugStringA("Unknown operation\n");
