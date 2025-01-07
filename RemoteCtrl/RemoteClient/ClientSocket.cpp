@@ -318,13 +318,13 @@ CClientSocket::CHelper::~CHelper()
 BOOL CClientSocket::InitSocketEnv()
 {
 	WSAData wsaData;
-	WORD wVersionRequested = MAKEWORD(1, 1);
+	WORD wVersionRequested = MAKEWORD(2, 2);
 	if (WSAStartup(wVersionRequested, &wsaData) != 0)
 	{
 		printf("WSAStartup failed with error: %d\n", GetLastError());
 		return FALSE;
 	}
-	if (LOBYTE(wsaData.wVersion) != 1 || HIBYTE(wsaData.wVersion) != 1)
+	if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2)
 	{
 		printf("LOBYTE HIBYTE errorNum = %d\n", GetLastError());
 		WSACleanup();
