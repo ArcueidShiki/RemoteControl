@@ -16,11 +16,14 @@ class ThreadWorker
 {
 public:
 	ThreadWorker();
+	~ThreadWorker();
 	ThreadWorker(ThreadFuncBase* obj, FUNC f);
 	ThreadWorker(const ThreadWorker& other);
 	ThreadWorker& operator=(const ThreadWorker& other);
+	ThreadWorker(ThreadWorker&& other) noexcept;
+	ThreadWorker& operator=(ThreadWorker&& other) noexcept;
 	int operator()();
-	BOOL IsValid();
+	BOOL IsValid() const;
 private:
 	ThreadFuncBase *base;
 	FUNC func; // member function pointer
@@ -36,13 +39,13 @@ public:
 	BOOL Start();
 	BOOL Stop();
 	BOOL IsIdle();
-	void UpdateWorker(const ::ThreadWorker& worker = ::ThreadWorker());
+	void UpdateWorker(ThreadWorker* pWorker = new ::ThreadWorker());
 protected:
 private:
 	void ThreadWorker();
 	HANDLE m_hThread;
 	BOOL m_bRunning;
-	std::atomic<::ThreadWorker> m_worker;
+	std::atomic<::ThreadWorker*> m_pWorker;
 };
 
 class ThreadPool
@@ -53,9 +56,9 @@ public:
 	~ThreadPool();
 	BOOL Invoke();
 	void Stop();
-	int DispatchWorker(const ThreadWorker& worker);
+	int DispatchWorker(::ThreadWorker *pWorker);
 	BOOL CheckThreadValid(size_t index);
 private:
 	std::mutex m_lock;
-	std::vector<CThread> m_threads;
+	std::vector<CThread*> m_threads;
 };
