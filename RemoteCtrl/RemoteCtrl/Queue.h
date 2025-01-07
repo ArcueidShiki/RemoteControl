@@ -150,6 +150,10 @@ inline BOOL CQueue<T>::Clear()
 		return FALSE;
 	}
 	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if (!hEvent)
+	{
+		return FALSE;
+	}
 	PPARAM pParam(QCLEAR, T(), hEvent);
 	BOOL ret = PostQueuedCompletionStatus(m_hCompletionPort, sizeof(PPARAM), (ULONG_PTR)&pParam, NULL);
 	if (!ret)

@@ -41,25 +41,31 @@ BOOL CThread::Stop()
 
 BOOL CThread::IsIdle()
 {
-	return m_worker.load().IsValid();
+	return m_pWorker.load()->IsValid();
 }
 
-void CThread::UpdateWorker(const::ThreadWorker& worker)
+void CThread::UpdateWorker(::ThreadWorker *pWorker)
 {
-	m_worker.store(worker);
+	if (!pWorker->IsValid())
+	{
+		delete pWorker;
+		pWorker = NULL;
+		return;
+	}
+	m_pWorker.exchange(pWorker);
 }
 
 void CThread::ThreadWorker()
 {
 	while (m_bRunning)
 	{
-		auto worker = m_worker.load();
-		if (worker.IsValid())
+		auto worker = m_pWorker.load();
+		if (worker->IsValid())
 		{
-			int ret = worker();
+			int ret = (*worker)();
 			if (ret < 0)
 			{
-				m_worker.store(::ThreadWorker());
+				m_pWorker.store(NULL);
 			}
 			else if (ret > 0)
 			{
@@ -79,6 +85,10 @@ ThreadWorker::ThreadWorker()
 {
 	base = NULL;
 	func = NULL;
+}
+
+ThreadWorker::~ThreadWorker()
+{
 }
 
 ThreadWorker::ThreadWorker(ThreadFuncBase* obj, FUNC f)
@@ -103,7 +113,20 @@ ThreadWorker& ThreadWorker::operator=(const ThreadWorker& other)
 	return *this;
 }
 
-BOOL ThreadWorker::IsValid()
+ThreadWorker::ThreadWorker(ThreadWorker&& other) noexcept
+{
+	base = other.base;
+	func = other.func;
+}
+
+ThreadWorker& ThreadWorker::operator=(ThreadWorker&& other) noexcept
+{
+	base = other.base;
+	func = other.func;
+	return *this;
+}
+
+BOOL ThreadWorker::IsValid() const
 {
 	return base && func;
 }
@@ -117,6 +140,10 @@ int ThreadWorker::operator()()
 ThreadPool::ThreadPool(size_t size)
 {
 	m_threads.resize(size);
+	for (size_t i = 0; i < size; i++)
+	{
+		m_threads[i] = new CThread();
+	}
 }
 
 ThreadPool::~ThreadPool()
@@ -130,7 +157,7 @@ BOOL ThreadPool::Invoke()
 	BOOL ret = TRUE;
 	for (size_t i = 0; i < m_threads.size(); i++)
 	{
-		if (!m_threads[i].Start())
+		if (!m_threads[i]->Start())
 		{
 			ret = FALSE;
 			break;
@@ -144,23 +171,37 @@ void ThreadPool::Stop()
 {
 	for (size_t i = 0; i < m_threads.size(); i++)
 	{
-		m_threads[i].Stop();
+		if (m_threads[i])
+		{
+			m_threads[i]->Stop();
+			delete m_threads[i];
+			m_threads[i] = NULL;
+		}
 	}
 }
 
-int ThreadPool::DispatchWorker(const ThreadWorker& worker)
+int ThreadPool::DispatchWorker(::ThreadWorker *pWorker)
 {
+	if (!pWorker)
+	{
+		return -1;
+	}
 	int index = -1;
 	m_lock.lock();
 	for (size_t i = 0; i < m_threads.size(); i++)
 	{
 		// using stack or queue to handle idle thread status is better
-		if (m_threads[i].IsIdle())
+		if (m_threads[i]->IsIdle())
 		{
-			m_threads[i].UpdateWorker(worker);
-			index = i;
+			m_threads[i]->UpdateWorker(pWorker);
+			index = int(i);
 			break;
 		}
+	}
+	if (pWorker)
+	{
+		delete pWorker;
+		pWorker = NULL;
 	}
 	m_lock.unlock();
 	return index;
@@ -170,7 +211,7 @@ BOOL ThreadPool::CheckThreadValid(size_t index)
 {
 	if (index < m_threads.size())
 	{
-		return m_threads[index].IsValid();
+		return m_threads[index]->IsValid();
 	}
 	return FALSE;
 }
