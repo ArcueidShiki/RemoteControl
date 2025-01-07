@@ -1,16 +1,20 @@
 #pragma once
 #include <atomic>
 #include <vector>
+#include <mutex>
+
+
 class ThreadFuncBase
 {
 public:
 
 };
 
+typedef int (ThreadFuncBase::* FUNC)();
+
 class ThreadWorker
 {
 public:
-	typedef int (ThreadFuncBase::* FUNC)();
 	ThreadWorker();
 	ThreadWorker(ThreadFuncBase* obj, FUNC f);
 	ThreadWorker(const ThreadWorker& other);
@@ -31,6 +35,7 @@ public:
 	BOOL IsValid();
 	BOOL Start();
 	BOOL Stop();
+	BOOL IsIdle();
 	void UpdateWorker(const ::ThreadWorker& worker = ::ThreadWorker());
 protected:
 private:
@@ -43,12 +48,14 @@ private:
 class ThreadPool
 {
 public:
-	ThreadPool();
+	ThreadPool() {}
 	ThreadPool(size_t size);
 	~ThreadPool();
 	BOOL Invoke();
 	void Stop();
 	int DispatchWorker(const ThreadWorker& worker);
+	BOOL CheckThreadValid(size_t index);
 private:
-	std::vector<CThread> m_thread;
+	std::mutex m_lock;
+	std::vector<CThread> m_threads;
 };

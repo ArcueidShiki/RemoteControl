@@ -39,6 +39,11 @@ BOOL CThread::Stop()
 	return WaitForSingleObject(m_hThread, INFINITE) == WAIT_OBJECT_0;
 }
 
+BOOL CThread::IsIdle()
+{
+	return m_worker.load().IsValid();
+}
+
 void CThread::UpdateWorker(const::ThreadWorker& worker)
 {
 	m_worker.store(worker);
@@ -145,5 +150,27 @@ void ThreadPool::Stop()
 
 int ThreadPool::DispatchWorker(const ThreadWorker& worker)
 {
-	return 0;
+	int index = -1;
+	m_lock.lock();
+	for (size_t i = 0; i < m_threads.size(); i++)
+	{
+		// using stack or queue to handle idle thread status is better
+		if (m_threads[i].IsIdle())
+		{
+			m_threads[i].UpdateWorker(worker);
+			index = i;
+			break;
+		}
+	}
+	m_lock.unlock();
+	return index;
+}
+
+BOOL ThreadPool::CheckThreadValid(size_t index)
+{
+	if (index < m_threads.size())
+	{
+		return m_threads[index].IsValid();
+	}
+	return FALSE;
 }
