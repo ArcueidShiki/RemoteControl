@@ -145,7 +145,12 @@ void iocp()
 {
     Server server;
     server.StartService();
-    getchar();
+	printf("Press any key to exit\n");
+    while (_kbhit() == 0)
+	{
+		Sleep(1);
+	}
+    printf("Exit\n");
 }
 
 // Set Property->Linker->1. Entry point: mainCRTStartup, 2. SubSystem: Windows.

@@ -86,6 +86,9 @@
     <ClCompile Include="Server.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Queue.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="RemoteCtrl.rc">

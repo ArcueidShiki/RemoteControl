@@ -5,6 +5,7 @@ CThread::CThread()
 {
 	m_bRunning = FALSE;
 	m_hThread = INVALID_HANDLE_VALUE;
+	m_pWorker.store(NULL);
 }
 
 CThread::~CThread()
@@ -22,7 +23,7 @@ void CThread::ThreadEntry(void* arg)
 BOOL CThread::IsValid()
 {
 	if (!m_hThread || m_hThread == INVALID_HANDLE_VALUE) return FALSE;
-	return WaitForSingleObject(m_hThread, 0) != WAIT_TIMEOUT;
+	return WaitForSingleObject(m_hThread, INFINITE) != WAIT_TIMEOUT;
 }
 
 BOOL CThread::Start()
@@ -36,42 +37,66 @@ BOOL CThread::Stop()
 {
 	if (!m_bRunning) return TRUE;
 	m_bRunning = FALSE;
+	auto pWorker = m_pWorker.load();
+	if (pWorker)
+	{
+		delete pWorker;
+		pWorker = NULL;
+	}
 	return WaitForSingleObject(m_hThread, INFINITE) == WAIT_OBJECT_0;
 }
 
 BOOL CThread::IsIdle()
 {
-	return m_pWorker.load()->IsValid();
+	// potential problems
+	auto pWorker = m_pWorker.load();
+	return !pWorker || !pWorker->IsValid();
 }
 
 void CThread::UpdateWorker(::ThreadWorker *pWorker)
 {
+	if (!pWorker) return;
 	if (!pWorker->IsValid())
 	{
 		delete pWorker;
 		pWorker = NULL;
 		return;
 	}
-	m_pWorker.exchange(pWorker);
+	auto pOldWorker = m_pWorker.exchange(pWorker);
+	if (pOldWorker)
+	{
+		delete pOldWorker;
+		pOldWorker = NULL;
+	}
 }
 
 void CThread::ThreadWorker()
 {
 	while (m_bRunning)
 	{
-		auto worker = m_pWorker.load();
-		if (worker->IsValid())
+		auto pWorker = m_pWorker.load();
+		if (!pWorker)
 		{
-			int ret = (*worker)();
+			Sleep(1);
+			continue;
+		}
+		if (pWorker->IsValid())
+		{
+			int ret = (*pWorker)();
 			if (ret < 0)
 			{
-				m_pWorker.store(NULL);
+				auto pOldWorker = m_pWorker.exchange(NULL);
+				if (pOldWorker)
+				{
+					delete pOldWorker;
+					pOldWorker = NULL;
+				}
 			}
 			else if (ret > 0)
 			{
-				CString str;
-				str.Format(_T("Thread found warning code %d\r\n"), ret);
-				OutputDebugString(str);
+				//CString str;
+				//str.Format(_T("Thread found warning code %d\r\n"), ret);
+				//OutputDebugString(str); // cause program cannot exit
 			}
 		}
 		else
@@ -89,6 +114,8 @@ ThreadWorker::ThreadWorker()
 
 ThreadWorker::~ThreadWorker()
 {
+	base = NULL;
+	func = NULL;
 }
 
 ThreadWorker::ThreadWorker(ThreadFuncBase* obj, FUNC f)
@@ -148,7 +175,7 @@ ThreadPool::ThreadPool(size_t size)
 
 ThreadPool::~ThreadPool()
 {
-	Stop();
+	StopPool();
 	m_threads.clear();
 }
 
@@ -157,17 +184,18 @@ BOOL ThreadPool::Invoke()
 	BOOL ret = TRUE;
 	for (size_t i = 0; i < m_threads.size(); i++)
 	{
-		if (!m_threads[i]->Start())
+		// Start failed
+		if (!m_threads[i] || !m_threads[i]->Start())
 		{
 			ret = FALSE;
 			break;
 		}
 	}
-	if (!ret) Stop();
+	if (!ret) StopPool();
 	return ret;
 }
 
-void ThreadPool::Stop()
+void ThreadPool::StopPool()
 {
 	for (size_t i = 0; i < m_threads.size(); i++)
 	{
@@ -191,18 +219,16 @@ int ThreadPool::DispatchWorker(::ThreadWorker *pWorker)
 	for (size_t i = 0; i < m_threads.size(); i++)
 	{
 		// using stack or queue to handle idle thread status is better
-		if (m_threads[i]->IsIdle())
+		// TODO IsIdle logic has problems
+		if (m_threads[i] && m_threads[i]->IsIdle())
 		{
 			m_threads[i]->UpdateWorker(pWorker);
 			index = int(i);
 			break;
 		}
 	}
-	if (pWorker)
-	{
-		delete pWorker;
-		pWorker = NULL;
-	}
+	// Don't need release memory here,
+	// let the sub thread relese after using.
 	m_lock.unlock();
 	return index;
 }

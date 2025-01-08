@@ -6,8 +6,6 @@
 
 class ThreadFuncBase
 {
-public:
-
 };
 
 typedef int (ThreadFuncBase::* FUNC)();
@@ -35,17 +33,18 @@ public:
 	CThread();
 	~CThread();
 	static void ThreadEntry(void* arg);
-	BOOL IsValid();
 	BOOL Start();
-	BOOL Stop();
-	BOOL IsIdle();
 	void UpdateWorker(ThreadWorker* pWorker = new ::ThreadWorker());
-protected:
 private:
+	friend class ThreadPool;
+	BOOL IsValid();
+	BOOL IsIdle();
+	BOOL Stop();
 	void ThreadWorker();
 	HANDLE m_hThread;
 	BOOL m_bRunning;
-	std::atomic<::ThreadWorker*> m_pWorker; // potential memory leak
+	// it can only be trivial copyable, potential memory leak with pointer
+	std::atomic<::ThreadWorker*> m_pWorker;
 };
 
 class ThreadPool
@@ -55,7 +54,7 @@ public:
 	ThreadPool(size_t size);
 	~ThreadPool();
 	BOOL Invoke();
-	void Stop();
+	void StopPool();
 	int DispatchWorker(::ThreadWorker *pWorker);
 	BOOL CheckThreadValid(size_t index);
 private:

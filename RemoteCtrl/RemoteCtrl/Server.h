@@ -4,9 +4,7 @@
 #include <map>
 
 #pragma warning(disable:4407)
-class Client;
-class Server;
-using PCLIENT = std::shared_ptr<Client>;
+
 enum Operator
 {
 	OP_NONE,
@@ -15,7 +13,8 @@ enum Operator
 	OP_SEND,
 	OP_ERROR
 };
-
+class Client;
+class Server;
 template <Operator op> class AcceptOverlapped;
 template <Operator op> class RecvOverlapped;
 template <Operator op> class SendOverlapped;
@@ -24,6 +23,8 @@ using ACCEPT_OVERLAPPED = AcceptOverlapped<OP_ACCEPT>;
 using RECV_OVERLAPPED = RecvOverlapped<OP_ACCEPT>;
 using SEND_OVERLAPPED = SendOverlapped<OP_SEND>;
 using ERROR_OVERLAPPED = ErrorOverlapped<OP_ERROR>;
+using PCLIENT = std::shared_ptr<Client>;
+// reference each other has problem
 
 /*
 1. passed by value, thread safe, but more overhead, when you need to take over ownership
@@ -50,9 +51,10 @@ public:
 	std::vector<char> m_buffer;
 	ThreadWorker m_worker; // corresponding callback
 	Server *m_server; //TODO  potential memory leak
-	PCLIENT m_client;
+	Client *m_client;
 	WSABUF m_wsabuf;
 	COverlapped();
+	virtual ~COverlapped();
 };
 
 template <Operator op>
@@ -87,14 +89,15 @@ public:
 	int ErrorWorker();
 };
 
-class Client
+class Client : public ThreadFuncBase
 {
 public:
 	Client();
 	~Client();
 	int Recv();
-	void SetOverlapped(PCLIENT& ptr);
-
+	int Send(void* buf, size_t size);
+	void SetOverlapped(Client *ptr);
+	int SendData(std::vector<char>& data);
 	// type conversion operator
 	operator SOCKET() const { return m_socket; }
 	operator PVOID() { return m_buffer.data(); }
@@ -120,6 +123,8 @@ private:
 	SOCKET m_socket;
 	SOCKADDR_IN *m_laddr;
 	SOCKADDR_IN *m_raddr;
+	std::atomic<BOOL> m_lock;
+	SendQueue<std::vector<char>> m_qSend; // Send queue buf.
 };
 
 class Server : public ThreadFuncBase
@@ -136,6 +141,6 @@ private:
 	ThreadPool m_pool;
 	HANDLE m_hIOCP;
 	SOCKET m_socket;
-	CQueue<Client> m_qClients;
+	//CQueue<Client> m_qClients;
 	SOCKADDR_IN m_addr;
 };
