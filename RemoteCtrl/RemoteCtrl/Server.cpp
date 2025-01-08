@@ -83,6 +83,7 @@ INT Server::ThreadLoop()
 	{
 		if (dwTransferred > 0 && CompletionKey != 0)
 		{
+			// TODO field has problems
 			COverlapped *pOverlapped = CONTAINING_RECORD(lpOverlapped, COverlapped, m_overlapped);
 			switch (pOverlapped->m_operator)
 			{
@@ -126,9 +127,17 @@ Client::Client()
 	m_laddr = NULL;
 	m_raddr = NULL;
 	m_inUse = FALSE;
-	m_overlapped = std::make_shared<ACCEPT_OVERLAPPED>();
-	m_overlapped->m_client.reset(this);
+	m_accept = std::make_shared<ACCEPT_OVERLAPPED>();
+	m_recv = std::make_shared<RECV_OVERLAPPED>();
+	m_send = std::make_shared<SEND_OVERLAPPED>();
+	m_error = std::make_shared<ERROR_OVERLAPPED>();
+	m_accept->m_client.reset(this);
+	m_recv->m_client.reset(this);
+	m_send->m_client.reset(this);
+	m_error->m_client.reset(this);
 	m_received = 0;
+	m_flags = 0;
+	m_used = 0;
 }
 
 Client::~Client()
@@ -136,27 +145,124 @@ Client::~Client()
 	closesocket(m_socket);
 }
 
-Client::operator SOCKET()
+int Client::Recv()
 {
-	return m_socket;
-}
-
-Client::operator PVOID()
-{
-	return m_buffer.data();
-}
-
-Client::operator LPOVERLAPPED()
-{
-	return &m_overlapped->m_overlapped;
-}
-
-Client::operator LPDWORD()
-{
-	return &m_received;
+	int recved = recv(m_socket, m_buffer.data() + m_used, int(m_buffer.size() -  m_used), 0);
+	if (recved <= 0) return -1;
+	m_used += recved;
+	// TODO parse packet
+	return 0;
 }
 
 void Client::SetOverlapped(PCLIENT& ptr)
 {
-	m_overlapped->m_client = ptr;
+	m_accept->m_client = ptr;
+	m_recv->m_client = ptr;
+	m_send->m_client = ptr;
+	m_error->m_client = ptr;
+}
+
+COverlapped::COverlapped()
+{
+	m_operator = 0;
+	m_overlapped = { 0 };
+	m_buffer.resize(0);
+	m_worker = ThreadWorker();
+	m_server = NULL;
+	m_client = NULL;
+	m_wsabuf = { (ULONG)m_buffer.size(), m_buffer.data() };
+}
+
+template<Operator op>
+inline AcceptOverlapped<op>::AcceptOverlapped()
+{
+	m_overlapped = { 0 };
+	m_operator = op;
+	m_buffer.resize(1024, 0);
+	m_server = NULL;
+	m_client = NULL;
+	m_wsabuf = { (ULONG)m_buffer.size(), m_buffer.data() };
+	m_worker = ThreadWorker(this, (FUNC)&AcceptOverlapped<op>::AcceptWorker);
+}
+
+template<Operator op>
+inline int AcceptOverlapped<op>::AcceptWorker()
+{
+	INT lLength = 0, rLength = 0;
+	if (*(LPDWORD)*m_client > 0)
+	{
+		GetAcceptExSockaddrs(*m_client, 0,
+			sizeof(SOCKADDR_IN) + 16,
+			sizeof(SOCKADDR_IN) + 16,
+			(SOCKADDR**)m_client->GetLocalAddr(), &lLength,
+			(SOCKADDR**)m_client->GetRemoteAddr(), &rLength);
+		int ret = WSARecv((SOCKET)*m_client,
+			m_client->GetRecvWSABuf(),
+			1, (LPDWORD)*m_client,
+			&m_client->GetFlags(),
+			*m_client, NULL);
+		if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING)
+		{
+			// TODO show error
+		}
+		if (!m_server || !m_server->NewAccept())
+		{
+			return -2;
+		}
+	}
+	return -1;
+}
+
+template<Operator op>
+inline RecvOverlapped<op>::RecvOverlapped()
+{
+	m_overlapped = { 0 };
+	m_operator = op;
+	m_buffer.resize(1024 * 256, 0);
+	m_server = NULL;
+	m_client = NULL;
+	m_wsabuf = { (ULONG)m_buffer.size(), m_buffer.data() };
+	m_worker = ThreadWorker(this, (FUNC)&RecvOverlapped<op>::RecvWorker);
+}
+
+template<Operator op>
+inline int RecvOverlapped<op>::RecvWorker()
+{
+	return m_client->Recv();
+}
+
+template<Operator op>
+inline SendOverlapped<op>::SendOverlapped()
+{
+	m_overlapped = { 0 };
+	m_operator = op;
+	m_buffer.resize(1024 * 256, 0);
+	m_server = NULL;
+	m_client = NULL;
+	m_wsabuf = { (ULONG)m_buffer.size(), m_buffer.data() };
+	m_worker = ThreadWorker(this, (FUNC)&SendOverlapped<op>::SendWorker);
+}
+
+template<Operator op>
+inline int SendOverlapped<op>::SendWorker()
+{
+	return 0;
+}
+
+template<Operator op>
+inline ErrorOverlapped<op>::ErrorOverlapped()
+{
+	m_overlapped = { 0 };
+	m_operator = op;
+	m_buffer.resize(1024, 0);
+	m_server = NULL;
+	m_client = NULL;
+	m_wsabuf = { (ULONG)m_buffer.size(), m_buffer.data() };
+	m_worker = ThreadWorker(this, (FUNC)&ErrorOverlapped<op>::ErrorWorker);
+}
+
+template<Operator op>
+inline int ErrorOverlapped<op>::ErrorWorker()
+{
+	return 0;
 }
