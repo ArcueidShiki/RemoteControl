@@ -45,7 +45,7 @@ private:
 	void ThreadWorker();
 	HANDLE m_hThread;
 	BOOL m_bRunning;
-	std::atomic<::ThreadWorker*> m_pWorker;
+	std::atomic<::ThreadWorker*> m_pWorker; // potential memory leak
 };
 
 class ThreadPool
