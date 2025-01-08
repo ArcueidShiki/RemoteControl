@@ -2,7 +2,7 @@
 // template better define in header: visibility, linking, code reuse
 #include <list>
 #include <atomic>
-#include "pch.h"
+#include "Thread.h"
 
 template<class T>
 class CQueue
@@ -12,10 +12,9 @@ public:
 	CQueue();
 	~CQueue();
 	BOOL PushBack(const T& data);
-	BOOL PopFront(T& data);
+	virtual BOOL PopFront(T& data);
 	BOOL Clear();
 	size_t Size();
-public:
 	enum {
 		QNONE,
 		QPUSH,
@@ -38,14 +37,34 @@ public:
 			hEvent = NULL;
 		}
 	} PPARAM; // POST parameter for IOCP message
-private:
+protected:
 	static void ThreadEntry(void* arg); // arg: m_hCompletionPort
 	void ThreadMain();
-	void DealParam(PPARAM* pParam);
+	virtual void DealParam(PPARAM* pParam);
 	std::list<T> m_lstData;
 	HANDLE m_hCompletionPort;
 	HANDLE m_hThread;
 	std::atomic<BOOL> m_lock;
+};
+
+
+template<class T>
+class SendQueue : public CQueue<T>, public ThreadFuncBase
+{
+public:
+	typedef int (ThreadFuncBase::* CB)(T &data);
+	SendQueue(ThreadFuncBase* obj, CB callback);
+	~SendQueue();
+protected:
+	// using timer to auto pop dispatch message
+	BOOL PopFront();
+	virtual BOOL PopFront(T& data) { return FALSE; }
+	virtual void DealParam(typename CQueue<T>::PPARAM* pParam);
+	int ThreadTick();
+private:
+	ThreadFuncBase* m_base;
+	CB m_callback;
+	CThread m_thread;
 };
 
 template<class T>
@@ -54,7 +73,7 @@ inline CQueue<T>::CQueue()
 	m_lock.store(FALSE);
 	m_hThread = INVALID_HANDLE_VALUE;
 	m_hCompletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);
-	if (m_hCompletionPort != NULL)
+	if (m_hCompletionPort && m_hCompletionPort != INVALID_HANDLE_VALUE)
 	{
 		m_hThread = (HANDLE)_beginthread(&CQueue<T>::ThreadEntry, 0, this);
 	}
@@ -67,12 +86,13 @@ inline CQueue<T>::~CQueue()
 	{
 		return;
 	}
+	Clear();
 	m_lock.exchange(TRUE);
 	// notify thread to exit
 	PostQueuedCompletionStatus(m_hCompletionPort, 0, NULL, NULL);
 	// wait for thread exit
 	WaitForSingleObject(m_hThread, INFINITE);
-	if (m_hCompletionPort != NULL)
+	if (m_hCompletionPort && m_hCompletionPort != INVALID_HANDLE_VALUE)
 	{
 		HANDLE hTmp = m_hCompletionPort;
 		m_hCompletionPort = NULL;
@@ -85,6 +105,10 @@ template<class T>
 inline BOOL CQueue<T>::PushBack(const T& data)
 {
 	if (m_lock.load())
+	{
+		return FALSE;
+	}
+	if (!m_hCompletionPort || m_hCompletionPort == INVALID_HANDLE_VALUE)
 	{
 		return FALSE;
 	}
@@ -104,7 +128,15 @@ inline BOOL CQueue<T>::PopFront(T& data)
 	{
 		return FALSE;
 	}
+	if (!m_hCompletionPort || m_hCompletionPort == INVALID_HANDLE_VALUE)
+	{
+		return FALSE;
+	}
 	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if (!hEvent || hEvent == INVALID_HANDLE_VALUE)
+	{
+		return FALSE;
+	}
 	PPARAM pParam(QPOP, data, hEvent);
 	if (!PostQueuedCompletionStatus(m_hCompletionPort, sizeof(PPARAM), (ULONG_PTR)&pParam, NULL))
 	{
@@ -126,7 +158,20 @@ inline size_t CQueue<T>::Size()
 	{
 		return -1;
 	}
+	if (!m_hCompletionPort || m_hCompletionPort == INVALID_HANDLE_VALUE)
+	{
+		return FALSE;
+	}
 	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if (!hEvent || hEvent == INVALID_HANDLE_VALUE)
+	{
+		return -1;
+	}
+	if (!m_hCompletionPort)
+	{
+		CloseHandle(hEvent);
+		return -1;
+	}
 	PPARAM pParam(QSIZE, T(), hEvent);
 	if (!PostQueuedCompletionStatus(m_hCompletionPort, sizeof(PPARAM), (ULONG_PTR)&pParam, NULL))
 	{
@@ -149,8 +194,12 @@ inline BOOL CQueue<T>::Clear()
 	{
 		return FALSE;
 	}
+	if (!m_hCompletionPort || m_hCompletionPort == INVALID_HANDLE_VALUE)
+	{
+		return FALSE;
+	}
 	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (!hEvent)
+	if (!hEvent || hEvent == INVALID_HANDLE_VALUE)
 	{
 		return FALSE;
 	}
@@ -235,4 +284,87 @@ inline void CQueue<T>::DealParam(PPARAM* pParam)
 		OutputDebugStringA("Unknown operation\n");
 		break;
 	}
+}
+
+// -------------------------------------------------------------------------
+
+template<class T>
+inline SendQueue<T>::SendQueue(ThreadFuncBase* obj, CB callback)
+	: CQueue<T>()
+{
+	m_base = obj;
+	m_callback = callback;
+	m_thread.Start();
+	m_thread.UpdateWorker(new ::ThreadWorker(this, (FUNC)& SendQueue<T>::ThreadTick));
+}
+
+template<class T>
+inline SendQueue<T>::~SendQueue()
+{
+	if (CQueue<T>::m_lock.load()) return;
+	CQueue<T>::Clear();
+	m_base = NULL;
+	m_callback = NULL;
+	//m_thread.Stop(); you don't need to call stop, it will be called at deconstructor.
+}
+
+template<class T>
+inline BOOL SendQueue<T>::PopFront()
+{
+	if (CQueue<T>::m_lock.load())
+	{
+		return FALSE;
+	}
+	typename CQueue<T>::PPARAM* pParam = new typename CQueue<T>::PPARAM(CQueue<T>::QPOP, T());
+	if (!PostQueuedCompletionStatus(CQueue<T>::m_hCompletionPort,
+		sizeof(CQueue<T>::PPARAM), (ULONG_PTR)&pParam, NULL))
+	{
+		delete pParam;
+		return FALSE;
+	}
+	return TRUE;
+}
+
+template<class T>
+inline void SendQueue<T>::DealParam(typename CQueue<T>::PPARAM* pParam)
+{
+	switch (pParam->nOpt)
+	{
+	case CQueue<T>::QPUSH:
+		CQueue<T>::m_lstData.push_back(pParam->data);
+		delete pParam;
+		break;
+	case CQueue<T>::QPOP:
+		if (!CQueue<T>::m_lstData.empty())
+		{
+			pParam->data = CQueue<T>::m_lstData.front();
+			// async handle
+			if ((m_base->*m_callback)(pParam->data))
+				CQueue<T>::m_lstData.pop_front();
+		}
+		delete pParam;
+		break;
+	case CQueue<T>::QSIZE:
+		pParam->nOpt = CQueue<T>::m_lstData.size();
+		if (pParam->hEvent) SetEvent(pParam->hEvent);
+		break;
+	case CQueue<T>::QCLEAR:
+		CQueue<T>::m_lstData.clear();
+		if (pParam->hEvent) SetEvent(pParam->hEvent);
+		break;
+	default:
+		OutputDebugStringA("Unknown operation\n");
+		break;
+	}
+}
+
+template<class T>
+inline int SendQueue<T>::ThreadTick()
+{
+	if (!CQueue<T>::m_lstData.empty())
+	{
+		PopFront();
+	}
+	Sleep(1);
+	return 0;
 }

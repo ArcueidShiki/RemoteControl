@@ -1,6 +1,9 @@
 #include "pch.h"
 #include "Server.h"
 #include <MSWSock.h>
+#include "Utils.h"
+
+using SEND_CALLBACK = SendQueue<std::vector<char>>::CB;
 
 Server::Server(ULONG ip, USHORT port) : m_pool(10)
 {
@@ -14,6 +17,9 @@ Server::Server(ULONG ip, USHORT port) : m_pool(10)
 
 Server::~Server()
 {
+	closesocket(m_socket);
+	CloseHandle(m_hIOCP);
+	m_mapClients.clear();
 }
 
 BOOL Server::StartService()
@@ -41,6 +47,7 @@ BOOL Server::StartService()
 		return FALSE;
 	}
 	CreateIoCompletionPort((HANDLE)m_socket, m_hIOCP, (ULONG_PTR)this, 0);
+	// go to this have problem
 	m_pool.Invoke();
 	ThreadWorker* pWorker = new ThreadWorker(this, (FUNC)&Server::ThreadLoop);
 	m_pool.DispatchWorker(pWorker);
@@ -57,7 +64,7 @@ void Server::InitSocket()
 BOOL Server::NewAccept()
 {
 	PCLIENT pClient(new Client());
-	pClient->SetOverlapped(pClient);
+	pClient->SetOverlapped(pClient.get());
 	m_mapClients.insert(std::pair<SOCKET, PCLIENT>(*pClient, pClient));
 	// async accept
 	if (!AcceptEx(m_socket, *pClient, *pClient, 0,
@@ -121,6 +128,7 @@ INT Server::ThreadLoop()
 }
 
 Client::Client()
+	: m_qSend(this, (SEND_CALLBACK)& Client::SendData)
 {
 	m_socket = WSASocketW(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 	m_buffer.resize(1024);
@@ -131,18 +139,29 @@ Client::Client()
 	m_recv = std::make_shared<RECV_OVERLAPPED>();
 	m_send = std::make_shared<SEND_OVERLAPPED>();
 	m_error = std::make_shared<ERROR_OVERLAPPED>();
-	m_accept->m_client.reset(this);
-	m_recv->m_client.reset(this);
-	m_send->m_client.reset(this);
-	m_error->m_client.reset(this);
 	m_received = 0;
 	m_flags = 0;
 	m_used = 0;
+	m_lock.store(FALSE);
 }
 
 Client::~Client()
 {
+	if (m_lock.load()) return;
+	m_lock.exchange(TRUE);
 	closesocket(m_socket);
+	m_buffer.clear();
+	m_laddr = NULL;
+	m_raddr = NULL;
+	m_inUse = FALSE;
+	m_accept.reset();
+	m_recv.reset();
+	m_send.reset();
+	m_error.reset();
+	m_received = 0;
+	m_flags = 0;
+	m_used = 0;
+	m_qSend.Clear();
 }
 
 int Client::Recv()
@@ -154,12 +173,38 @@ int Client::Recv()
 	return 0;
 }
 
-void Client::SetOverlapped(PCLIENT& ptr)
+int Client::Send(void* buf, size_t size)
+{
+	std::vector<char> vec(size);
+	memcpy(vec.data(), buf, size);
+	if (m_qSend.PushBack(vec))
+	{
+		return 0;
+	}
+	return -1;
+}
+
+void Client::SetOverlapped(Client *ptr)
 {
 	m_accept->m_client = ptr;
 	m_recv->m_client = ptr;
 	m_send->m_client = ptr;
 	m_error->m_client = ptr;
+}
+
+int Client::SendData(std::vector<char>& data)
+{
+	if (m_qSend.Size())
+	{
+		int ret = WSASend(m_socket, GetSendWSABuf(),
+			1, &m_received, m_flags, &m_send->m_overlapped, NULL);
+		if (ret != 0 && WSAGetLastError() != WSA_IO_PENDING)
+		{
+			CUtils::ShowError();
+			return ret;
+		}
+	}
+	return 0;
 }
 
 COverlapped::COverlapped()
@@ -171,6 +216,11 @@ COverlapped::COverlapped()
 	m_server = NULL;
 	m_client = NULL;
 	m_wsabuf = { (ULONG)m_buffer.size(), m_buffer.data() };
+}
+
+COverlapped::~COverlapped()
+{
+
 }
 
 template<Operator op>
@@ -246,6 +296,8 @@ inline SendOverlapped<op>::SendOverlapped()
 template<Operator op>
 inline int SendOverlapped<op>::SendWorker()
 {
+	// TODO
+	// Send Action won't complete immediately
 	return 0;
 }
 
