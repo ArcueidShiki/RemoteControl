@@ -11,12 +11,12 @@ class ThreadWorker
 public:
 	ThreadWorker();
 	~ThreadWorker();
-	ThreadWorker(ThreadFuncBase* obj, FUNC f);
+	ThreadWorker(void* obj, FUNC f);
 	ThreadWorker(const ThreadWorker& other);
 	ThreadWorker& operator=(const ThreadWorker& other);
 	ThreadWorker(ThreadWorker&& other) noexcept;
 	ThreadWorker& operator=(ThreadWorker&& other) noexcept;
-	int operator()();
+	int operator()() const;
 	BOOL IsValid() const;
 private:
 	ThreadFuncBase* base;

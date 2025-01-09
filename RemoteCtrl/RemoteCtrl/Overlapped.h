@@ -4,6 +4,7 @@
 #include "Thread.h"
 #include "Server.h"
 #include "Operator.h"
+#include "Utils.h"
 #pragma warning(disable:4407)
 
 class Client;
@@ -32,7 +33,7 @@ public:
 	DWORD m_operator;
 	std::vector<char> m_buffer;
 	ThreadWorker m_worker; // corresponding callback
-	Server* m_server; //TODO  potential memory leak
+	Server* m_server;
 	Client* m_client;
 	WSABUF m_wsabuf;
 	COverlapped();
@@ -46,7 +47,7 @@ class AcceptOverlapped : public COverlapped, ThreadFuncBase
 {
 public:
 	AcceptOverlapped();
-	int AcceptWorker();
+	int AcceptWorker();	// assign to m_worker when constructing.
 };
 
 template <Operator op>
@@ -73,11 +74,6 @@ public:
 	int ErrorWorker();
 };
 
-using ACCEPT_OVERLAPPED = AcceptOverlapped<OP_ACCEPT>;
-using RECV_OVERLAPPED = RecvOverlapped<OP_ACCEPT>;
-using SEND_OVERLAPPED = SendOverlapped<OP_SEND>;
-using ERROR_OVERLAPPED = ErrorOverlapped<OP_ERROR>;
-
 template<Operator op>
 inline AcceptOverlapped<op>::AcceptOverlapped()
 {
@@ -93,28 +89,38 @@ inline AcceptOverlapped<op>::AcceptOverlapped()
 template<Operator op>
 inline int AcceptOverlapped<op>::AcceptWorker()
 {
+	if (!m_client) return -1;
+	if (!m_server) return -1;
 	INT lLength = 0, rLength = 0;
-	if (*(LPDWORD)*m_client > 0)
+	if (m_client->GetBufSize())
 	{
-		GetAcceptExSockaddrs(*m_client, 0,
+		GetAcceptExSockaddrs(
+			m_client->GetBuffer(), 0,
 			sizeof(SOCKADDR_IN) + 16,
 			sizeof(SOCKADDR_IN) + 16,
 			(SOCKADDR**)m_client->GetLocalAddr(), &lLength,
 			(SOCKADDR**)m_client->GetRemoteAddr(), &rLength);
-		int ret = WSARecv((SOCKET)*m_client,
+
+		m_server->BindNewSocket(m_client->GetSocket());
+		int ret = WSARecv(
+			m_client->GetSocket(),
 			m_client->GetRecvWSABuf(),
-			1, (LPDWORD)*m_client,
+			1, m_client->GetReceived(),
 			&m_client->GetFlags(),
-			*m_client, NULL);
+			m_client->GetRecvOverLapped(), NULL);
 		if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING)
 		{
-			// TODO show error
+			// 997 WSA_IO_PENDING is not considered as an error in nonblock mode.
+			TRACE("WSARecv failed with error: %d\n", WSAGetLastError());
+			CUtils::ShowError();
+			return -1;
 		}
-		if (!m_server || !m_server->NewAccept())
+		if (!m_server->NewAccept())
 		{
-			return -2;
+			return -1;
 		}
 	}
+	// ret < 0 end worker.
 	return -1;
 }
 
@@ -133,6 +139,10 @@ inline RecvOverlapped<op>::RecvOverlapped()
 template<Operator op>
 inline int RecvOverlapped<op>::RecvWorker()
 {
+	if (!m_client)
+	{
+		return -1;
+	}
 	return m_client->Recv();
 }
 
@@ -151,6 +161,10 @@ inline SendOverlapped<op>::SendOverlapped()
 template<Operator op>
 inline int SendOverlapped<op>::SendWorker()
 {
+	if (!m_client)
+	{
+		return -1;
+	}
 	// TODO
 	// Send Action won't complete immediately
 	return 0;
@@ -159,6 +173,10 @@ inline int SendOverlapped<op>::SendWorker()
 template<Operator op>
 inline ErrorOverlapped<op>::ErrorOverlapped()
 {
+	if (!m_client)
+	{
+		return;
+	}
 	m_overlapped = { 0 };
 	m_operator = op;
 	m_buffer.resize(1024, 0);

@@ -66,6 +66,7 @@ void CClientController::ReleaseInstance()
 
 CClientController::~CClientController()
 {
+	m_mapFunc.clear();
 	WaitForSingleObject(m_hThread, 100);
 	if (m_clientDlg)
 	{
@@ -81,6 +82,11 @@ CClientController::~CClientController()
 	{
 		delete[] m_remotePath;
 		m_remotePath = NULL;
+	}
+	TerminateThread(m_hThread, 0);
+	if (m_hThreadWatch != INVALID_HANDLE_VALUE)
+	{
+		TerminateThread(m_hThreadWatch, 0);
 	}
 }
 

@@ -8,7 +8,7 @@ Client::Client()
 	: m_qSend(this, (SEND_CALLBACK)&Client::SendData)
 {
 	m_socket = WSASocketW(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
-	m_buffer.resize(1024);
+	m_buffer.resize(1024, 0);
 	m_laddr = NULL;
 	m_raddr = NULL;
 	m_inUse = FALSE;
@@ -43,11 +43,16 @@ Client::~Client()
 
 int Client::Recv()
 {
-	int recved = recv(m_socket, m_buffer.data() + m_used, int(m_buffer.size() - m_used), 0);
-	if (recved <= 0) return -1;
-	m_used += recved;
+	//  TODO has recv data blocked issues potential problems
+	//int recved = recv(m_socket, m_recv->m_buffer.data() + m_used, int(m_recv->m_buffer.size() - m_used), 0);
+	//if (recved <= 0) return -1;
+	//m_used += recved;
 	// TODO parse packet
-	return 0;
+	CUtils::Dump((BYTE*)m_recv->m_buffer.data(), m_received);
+	CUtils::Dump((BYTE*)m_recv->m_wsabuf.buf, m_received);
+	TRACE("Get : [%lu] Bytes From Client; recv buff position:[%p], buf size:[%zu]\n", m_received, m_recv->m_buffer.data(), m_recv->m_buffer.size());
+	TRACE("Get : [%lu] Bytes From Client; recv  wsabuff position:[%p], wsabuf size:[%zu]\n", m_received, m_recv->m_wsabuf.buf, m_recv->m_wsabuf.len);
+	return -1;
 }
 
 int Client::Send(void* buf, size_t size)
@@ -75,31 +80,51 @@ int Client::SendData(std::vector<char>& data)
 	{
 		int ret = WSASend(m_socket, GetSendWSABuf(),
 			1, &m_received, m_flags, &m_send->m_overlapped, NULL);
-		if (ret != 0 && WSAGetLastError() != WSA_IO_PENDING)
+		if (ret != 0)
 		{
-			CUtils::ShowError();
-			return ret;
+			int err = WSAGetLastError();
+			TRACE("Client, Send Queue err: %d\n", err);
+			if (err != WSA_IO_PENDING)
+			{
+				CUtils::ShowError();
+				return ret;
+			}
 		}
 	}
 	return 0;
 }
 
-Client::operator SOCKET() const
+SOCKET Client::GetSocket() const
 {
 	return m_socket;
 }
 
-Client::operator PVOID()
+PVOID Client::GetBuffer()
 {
-	return m_buffer.data();
+	return (void*)m_buffer.data();
 }
 
-Client::operator LPOVERLAPPED()
+LPOVERLAPPED Client::GetAcceptOverlapped()
 {
 	return &m_accept->m_overlapped;
 }
 
-Client::operator LPDWORD()
+LPOVERLAPPED Client::GetRecvOverLapped()
+{
+	return &m_recv->m_overlapped;
+}
+
+LPOVERLAPPED Client::GetSendOverLapped()
+{
+	return &m_send->m_overlapped;
+}
+
+LPOVERLAPPED Client::GetErrorOverLapped()
+{
+	return &m_error->m_overlapped;
+}
+
+LPDWORD Client::GetReceived()
 {
 	return &m_received;
 }

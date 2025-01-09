@@ -9,7 +9,7 @@ public:
 	~ThreadPool();
 	BOOL Invoke();
 	void StopPool();
-	int DispatchWorker(::ThreadWorker* pWorker);
+	int DispatchWorker(const ThreadWorker &worker);
 	BOOL CheckThreadValid(size_t index);
 private:
 	std::mutex m_lock;

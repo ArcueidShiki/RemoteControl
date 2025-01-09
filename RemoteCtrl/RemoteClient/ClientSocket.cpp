@@ -105,9 +105,10 @@ CClientSocket& CClientSocket::operator=(const CClientSocket& other)
 
 CClientSocket::~CClientSocket()
 {
-	WaitForSingleObject(m_hThread, INFINITE);
+	WaitForSingleObject(m_hThread, 100);
 	closesocket(m_socket);
 	WSACleanup();
+	TerminateThread(m_hThread, 0);
 }
 
 CClientSocket* CClientSocket::GetInstance()

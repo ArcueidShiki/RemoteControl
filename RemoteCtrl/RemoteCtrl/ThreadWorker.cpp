@@ -9,13 +9,13 @@ ThreadWorker::ThreadWorker()
 
 ThreadWorker::~ThreadWorker()
 {
-	base = NULL;
+	//base = NULL; cannot be null, it's has other references
 	func = NULL;
 }
 
-ThreadWorker::ThreadWorker(ThreadFuncBase* obj, FUNC f)
+ThreadWorker::ThreadWorker(void* obj, FUNC f)
 {
-	base = obj;
+	base = (ThreadFuncBase*)obj;
 	func = f;
 }
 
@@ -50,11 +50,16 @@ ThreadWorker& ThreadWorker::operator=(ThreadWorker&& other) noexcept
 
 BOOL ThreadWorker::IsValid() const
 {
-	return base && func;
+	BOOL ret = base && func;
+	return ret;
 }
 
-int ThreadWorker::operator()()
+int ThreadWorker::operator()() const
 {
-	if (IsValid()) return (base->*func)();
+	if (IsValid()) {
+		int ret = (base->*func)();
+		//TRACE("Worker work result = %d\n", ret);
+		return ret;
+	}
 	return -1;
 }

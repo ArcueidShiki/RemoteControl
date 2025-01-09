@@ -45,9 +45,9 @@ void ThreadPool::StopPool()
 	}
 }
 
-int ThreadPool::DispatchWorker(::ThreadWorker* pWorker)
+int ThreadPool::DispatchWorker(const ThreadWorker &worker)
 {
-	if (!pWorker)
+	if (!worker.IsValid())
 	{
 		return -1;
 	}
@@ -55,17 +55,14 @@ int ThreadPool::DispatchWorker(::ThreadWorker* pWorker)
 	m_lock.lock();
 	for (size_t i = 0; i < m_threads.size(); i++)
 	{
-		// using stack or queue to handle idle thread status is better
-		// TODO IsIdle logic has problems
+		// TODO optimization
 		if (m_threads[i] && m_threads[i]->IsIdle())
 		{
-			m_threads[i]->UpdateWorker(pWorker);
+			m_threads[i]->UpdateWorker(worker);
 			index = int(i);
 			break;
 		}
 	}
-	// Don't need release memory here,
-	// let the sub thread relese after using.
 	m_lock.unlock();
 	return index;
 }
