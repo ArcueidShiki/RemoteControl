@@ -100,7 +100,7 @@ inline int AcceptOverlapped<op>::AcceptWorker()
 			sizeof(SOCKADDR_IN) + 16,
 			(SOCKADDR**)m_client->GetLocalAddr(), &lLength,
 			(SOCKADDR**)m_client->GetRemoteAddr(), &rLength);
-
+		// add accepted client socket to IOCP handle
 		m_server->BindNewSocket(m_client->GetSocket());
 		int ret = WSARecv(
 			m_client->GetSocket(),
