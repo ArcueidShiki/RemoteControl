@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "Client.h"
 #include "Utils.h"
+#include "Packet.h"
 
 using SEND_CALLBACK = SendQueue<std::vector<char>>::CB;
 
@@ -43,15 +44,13 @@ Client::~Client()
 
 int Client::Recv()
 {
-	//  TODO has recv data blocked issues potential problems
 	//int recved = recv(m_socket, m_recv->m_buffer.data() + m_used, int(m_recv->m_buffer.size() - m_used), 0);
 	//if (recved <= 0) return -1;
 	//m_used += recved;
-	// TODO parse packet
-	CUtils::Dump((BYTE*)m_recv->m_buffer.data(), m_received);
-	CUtils::Dump((BYTE*)m_recv->m_wsabuf.buf, m_received);
-	TRACE("Get : [%lu] Bytes From Client; recv buff position:[%p], buf size:[%zu]\n", m_received, m_recv->m_buffer.data(), m_recv->m_buffer.size());
-	TRACE("Get : [%lu] Bytes From Client; recv  wsabuff position:[%p], wsabuf size:[%zu]\n", m_received, m_recv->m_wsabuf.buf, m_recv->m_wsabuf.len);
+	//CUtils::Dump((BYTE*)m_recv->m_buffer.data(), m_received);
+	//CUtils::Dump((BYTE*)m_recv->m_wsabuf.buf, m_received);
+	//TRACE("Get : [%lu] Bytes From Client; recv buff position:[%p], buf size:[%zu]\n", m_received, m_recv->m_buffer.data(), m_recv->m_buffer.size());
+	//TRACE("Get : [%lu] Bytes From Client; recv  wsabuff position:[%p], wsabuf size:[%zu]\n", m_received, m_recv->m_wsabuf.buf, m_recv->m_wsabuf.len);
 	return -1;
 }
 

@@ -83,14 +83,12 @@ BOOL Server::NewAccept()
 		sizeof(SOCKADDR_IN) + 16,
 		sizeof(SOCKADDR_IN) + 16,
 		pClient->GetReceived(),
-		pClient->GetAcceptOverlapped())) // incorrect arguments
+		pClient->GetAcceptOverlapped()))
 	{
 		int err = WSAGetLastError();
 		if (err != WSA_IO_PENDING)
 		{
 			TRACE("AcceptEx failed with error: %d\n", err);
-			// TODO 10022
-			// Memory violation, heap pointer
 			closesocket(m_socket);
 			CloseHandle(m_hIOCP);
 			m_socket = INVALID_SOCKET;

@@ -152,8 +152,14 @@ void iocp()
     printf("Exit\n");
 }
 
+void udp_server();
+void udp_client(BOOL isHost = TRUE);
+
+//int wmain(int argc, wchar_t *argv[])
+//int _tmain(int argc, TCHAR *argv[])
+
 // Set Property->Linker->1. Entry point: mainCRTStartup, 2. SubSystem: Windows.
-int main()
+int main(int argc, char *argv[])
 {
 #if 0
     if (!CUtils::IsAdmin())
@@ -161,12 +167,47 @@ int main()
         return CUtils::RunAsAdmin() ? 0 : 1;
     }
 #endif
+
     if (!CUtils::Init())
     {
         return 1;
     }
 
-    iocp();
+    if (argc == 1)
+    {   // udp server
+        char strDir[MAX_PATH];
+		GetCurrentDirectoryA(MAX_PATH, strDir);
+        STARTUPINFOA si = { 0 };
+        PROCESS_INFORMATION pi = {};
+        string strCmd = argv[0];
+        strCmd += " 1"; // argc = 2
+        BOOL ret = CreateProcessA(NULL, (LPSTR)strCmd.c_str(), NULL, NULL, FALSE, 0, NULL, strDir, &si, &pi);
+        if (ret)
+        {
+            CloseHandle(pi.hThread);
+            CloseHandle(pi.hProcess);
+            TRACE("Process pid:%d, tid:%d\n", pi.dwProcessId, pi.dwThreadId);
+            strCmd += " 2"; // argc = 3
+            ret = CreateProcessA(NULL, (LPSTR)strCmd.c_str(), NULL, NULL, FALSE, 0, NULL, strDir, &si, &pi);
+			if (ret)
+			{
+				CloseHandle(pi.hThread);
+				CloseHandle(pi.hProcess);
+				TRACE("Process pid:%d, tid:%d\n", pi.dwProcessId, pi.dwThreadId);
+                udp_server();
+			}
+        }
+    }
+    else if (argc == 2)
+    {
+        // client host
+        udp_client();
+    }
+    else
+    {   // client servant
+        udp_client(FALSE);
+    }
+    //iocp();
 
 #if 0
     HANDLE hIOCP = INVALID_HANDLE_VALUE;
@@ -220,4 +261,22 @@ int main()
     }
 #endif
     return 0;
+}
+
+void udp_server()
+{
+    printf("%s(%d):%s\n", __FILE__, __LINE__, __FUNCTION__);
+    getchar();
+}
+
+void udp_client(BOOL isHost)
+{
+    if (isHost)
+    {
+        printf("%s(%d):%s\n", __FILE__, __LINE__, __FUNCTION__);
+    }
+    else
+    {
+        printf("%s(%d):%s\n", __FILE__, __LINE__, __FUNCTION__);
+    }
 }

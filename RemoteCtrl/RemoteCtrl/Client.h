@@ -3,6 +3,7 @@
 #include "Overlapped.h"
 #include "SendQueue.h"
 #include "Operator.h"
+#include "Command.h"
 
 // Forward declaration due to circular dependency
 template <Operator op> class AcceptOverlapped;
@@ -52,4 +53,5 @@ private:
 	SOCKADDR_IN* m_raddr;
 	std::atomic<BOOL> m_lock;
 	SendQueue<std::vector<char>> m_qSend; // Send queue buf.
+	// TODO add Command::RunCommand;
 };

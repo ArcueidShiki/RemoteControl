@@ -59,6 +59,7 @@ void CClientController::ReleaseInstance()
 {
 	if (m_instance)
 	{
+		m_mapFunc.clear();
 		delete m_instance;
 		m_instance = NULL;
 	}
@@ -66,7 +67,6 @@ void CClientController::ReleaseInstance()
 
 CClientController::~CClientController()
 {
-	m_mapFunc.clear();
 	WaitForSingleObject(m_hThread, 100);
 	if (m_clientDlg)
 	{
