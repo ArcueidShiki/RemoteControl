@@ -10,7 +10,7 @@ class CQueue
 	// thread safe queue using IOCP
 public:
 	CQueue();
-	~CQueue();
+	virtual ~CQueue();
 	BOOL PushBack(const T& data);
 	virtual BOOL PopFront(T& data);
 	BOOL Clear();
@@ -27,7 +27,7 @@ public:
 	{
 		size_t nOpt;
 		T data;
-		_beginthread_proc_type cbFunc;
+		//_beginthread_proc_type cbFunc;
 		HANDLE hEvent; // for pop operation
 		IocpParam(int nOpt, const T& data, HANDLE event = NULL)
 			: nOpt(nOpt), data(data), hEvent(event) {}
@@ -38,13 +38,14 @@ public:
 		}
 	} PPARAM; // POST parameter for IOCP message
 protected:
-	static void ThreadEntry(void* arg); // arg: m_hCompletionPort
-	void ThreadMain();
-	virtual void DealParam(PPARAM* pParam);
+	virtual void HandleOpt(PPARAM* pParam);
 	std::list<T> m_lstData;
 	HANDLE m_hCompletionPort;
 	HANDLE m_hThread;
 	std::atomic<BOOL> m_lock;
+private:
+	static void ThreadEntry(void* arg); // arg: m_hCompletionPort
+	void ThreadQueue();
 };
 
 // no explicit instantiation
@@ -73,7 +74,12 @@ inline CQueue<T>::~CQueue()
 	// notify thread to exit
 	PostQueuedCompletionStatus(m_hCompletionPort, 0, NULL, NULL);
 	// wait for thread exit
-	WaitForSingleObject(m_hThread, INFINITE);
+	if (WaitForSingleObject(m_hThread, 1000) != WAIT_OBJECT_0)
+	{
+
+	}
+	TerminateThread(m_hThread, 0);
+	//CloseHandle(m_hThread);
 	if (m_hCompletionPort && m_hCompletionPort != INVALID_HANDLE_VALUE)
 	{
 		HANDLE hTmp = m_hCompletionPort;
@@ -201,12 +207,12 @@ template<class T>
 inline void CQueue<T>::ThreadEntry(void* arg)
 {
 	CQueue<T>* self = (CQueue<T>*)arg;
-	self->ThreadMain();
+	self->ThreadQueue();
 	_endthread();
 }
 
 template<class T>
-inline void CQueue<T>::ThreadMain()
+inline void CQueue<T>::ThreadQueue()
 {
 	PPARAM* pParam = NULL;
 	DWORD dwTransferred = 0;
@@ -218,11 +224,11 @@ inline void CQueue<T>::ThreadMain()
 	{
 		if (dwTransferred == 0 || CompletionKey == 0)
 		{
-			printf("Thread is prepare to exit\n");
+			printf("Queue Thread is prepare to exit\n");
 			break;
 		}
 		PPARAM* pParam = (PPARAM*)CompletionKey;
-		DealParam(pParam);
+		HandleOpt(pParam);
 	}
 	while (GetQueuedCompletionStatus(m_hCompletionPort, &dwTransferred, &CompletionKey, &pOverlapped, 0))
 	{
@@ -231,14 +237,14 @@ inline void CQueue<T>::ThreadMain()
 			continue;
 		}
 		PPARAM* pParam = (PPARAM*)CompletionKey;
-		DealParam(pParam);
+		HandleOpt(pParam);
 	}
 	CloseHandle(m_hCompletionPort);
 	m_hCompletionPort = NULL;
 }
 
 template<class T>
-inline void CQueue<T>::DealParam(PPARAM* pParam)
+inline void CQueue<T>::HandleOpt(PPARAM* pParam)
 {
 	switch (pParam->nOpt)
 	{

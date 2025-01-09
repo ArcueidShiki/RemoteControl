@@ -22,8 +22,13 @@ void CThread::ThreadEntry(void* arg)
 
 BOOL CThread::IsValid()
 {
-	if (!m_hThread || m_hThread == INVALID_HANDLE_VALUE) return FALSE;
-	return WaitForSingleObject(m_hThread, INFINITE) != WAIT_TIMEOUT;
+	if (!m_hThread || m_hThread == INVALID_HANDLE_VALUE)
+	{
+		return FALSE;
+	}
+	// a thread is not in singled state means, it still running
+	// otherwise, it has finished, been signaled notify others.
+	return WaitForSingleObject(m_hThread, 0) == WAIT_TIMEOUT;
 }
 
 BOOL CThread::Start()
@@ -35,43 +40,31 @@ BOOL CThread::Start()
 
 BOOL CThread::Stop()
 {
-	if (!m_bRunning) return TRUE;
 	m_bRunning = FALSE;
-	auto pWorker = m_pWorker.load();
-	if (pWorker)
+	// wait failed
+	if (WaitForSingleObject(m_hThread, 1000) != WAIT_OBJECT_0)
 	{
-		delete pWorker;
-		pWorker = NULL;
+		TerminateThread(m_hThread, 0);
 	}
-	return WaitForSingleObject(m_hThread, INFINITE) == WAIT_OBJECT_0;
+	return TRUE;
 }
 
 BOOL CThread::IsIdle()
 {
-	// potential problems
 	auto pWorker = m_pWorker.load();
-	return !pWorker || !pWorker->IsValid();
+	BOOL ret = !pWorker || !pWorker->IsValid();
+	return ret;
 }
 
-void CThread::UpdateWorker(::ThreadWorker *pWorker)
+void CThread::UpdateWorker(const ::ThreadWorker& worker)
 {
-	if (!pWorker) return;
-	if (!pWorker->IsValid())
-	{
-		delete pWorker;
-		pWorker = NULL;
-		return;
-	}
-	auto pOldWorker = m_pWorker.exchange(pWorker);
-	if (pOldWorker)
-	{
-		delete pOldWorker;
-		pOldWorker = NULL;
-	}
+	if (!worker.IsValid()) return;
+	m_pWorker.exchange(&worker);
 }
 
 void CThread::ThreadWorker()
 {
+	m_bRunning = TRUE;
 	while (m_bRunning)
 	{
 		auto pWorker = m_pWorker.load();
@@ -82,21 +75,20 @@ void CThread::ThreadWorker()
 		}
 		if (pWorker->IsValid())
 		{
-			int ret = (*pWorker)();
-			if (ret < 0)
+			if (WaitForSingleObject(m_hThread, 0) == WAIT_TIMEOUT)
 			{
-				auto pOldWorker = m_pWorker.exchange(NULL);
-				if (pOldWorker)
+				// call worker method;
+				int ret = (*pWorker)();
+				if (ret != 0)
 				{
-					delete pOldWorker;
-					pOldWorker = NULL;
+					CString str;
+					str.Format(_T("Thread found warning code %d\r\n"), ret);
+					OutputDebugString(str);
 				}
-			}
-			else if (ret > 0)
-			{
-				//CString str;
-				//str.Format(_T("Thread found warning code %d\r\n"), ret);
-				//OutputDebugString(str); // cause program cannot exit
+				if (ret < 0)
+				{
+					m_pWorker.exchange(NULL);
+				}
 			}
 		}
 		else

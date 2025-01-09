@@ -425,7 +425,7 @@ void CRemoteClientDlg::InitUiData()
 	UpdateData();
 	m_port = _T("20000");
 	// 192.169.2.123:0xC0A8027B, 127.0.0.1:0x7F000001 If using virtual box, set network mode to bridge.
-	m_server_address = 0xC0A8027B;
+	m_server_address = 0x7F000001;
 	UpdateData(FALSE);
 	CClientController::GetInstance()->UpdateAddress(m_server_address, static_cast<USHORT>(atoi(CW2A(m_port))));
 	m_dlgStatus.Create(IDD_DLG_STATUS, this);

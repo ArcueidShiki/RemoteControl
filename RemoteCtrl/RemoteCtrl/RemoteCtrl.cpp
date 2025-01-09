@@ -110,7 +110,6 @@ void ThreadQueueEntry(HANDLE hIOCP)
     ThreadMain(hIOCP);
 	_endthread(); // may cause local variable to unable to destroyed leading to memory leak
 }
-#endif
 
 void test()
 {
@@ -141,15 +140,15 @@ void test()
     printf("Cleared, Size: %zu\n", lstString.Size());
 }
 
+#endif
+
+
 void iocp()
 {
     Server server;
     server.StartService();
 	printf("Press any key to exit\n");
-    while (_kbhit() == 0)
-	{
-		Sleep(1);
-	}
+    getchar();
     printf("Exit\n");
 }
 

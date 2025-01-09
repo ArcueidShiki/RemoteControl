@@ -14,13 +14,15 @@ public:
 	~Server();
 	BOOL StartService();
 	BOOL NewAccept();
+	void BindNewSocket(SOCKET sock);
 	std::map<SOCKET, PCLIENT> m_mapClients;
 private:
 	void InitSocket();
-	INT ThreadLoop();
+	INT IOCPLoop();
 	ThreadPool m_pool;
 	HANDLE m_hIOCP;
 	SOCKET m_socket;
 	//CQueue<Client> m_qClients;
 	SOCKADDR_IN m_addr;
+	ThreadWorker m_worker;
 };
