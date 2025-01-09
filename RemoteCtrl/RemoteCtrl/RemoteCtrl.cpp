@@ -10,6 +10,7 @@
 #include "Queue.h"
 #include <MSWSock.h>
 #include "Server.h"
+#include <ws2tcpip.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -173,13 +174,15 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    WSADATA wsa;
+    WSAStartup(MAKEWORD(2, 2), &wsa);
     if (argc == 1)
     {   // udp server
         char strDir[MAX_PATH];
 		GetCurrentDirectoryA(MAX_PATH, strDir);
         STARTUPINFOA si = { 0 };
         PROCESS_INFORMATION pi = {};
-        string strCmd = argv[0];
+        string strCmd = argv[0]; // program name
         strCmd += " 1"; // argc = 2
         BOOL ret = CreateProcessA(NULL, (LPSTR)strCmd.c_str(), NULL, NULL, FALSE, 0, NULL, strDir, &si, &pi);
         if (ret)
@@ -207,6 +210,8 @@ int main(int argc, char *argv[])
     {   // client servant
         udp_client(FALSE);
     }
+    WSACleanup();
+
     //iocp();
 
 #if 0
@@ -266,17 +271,132 @@ int main(int argc, char *argv[])
 void udp_server()
 {
     printf("%s(%d):%s\n", __FILE__, __LINE__, __FUNCTION__);
-    getchar();
+    SOCKET sock = socket(PF_INET, SOCK_DGRAM, 0);
+    if (sock == INVALID_SOCKET)
+    {
+        printf("%s(%d):%s Server Socket Error(%d)\n",  __FILE__, __LINE__, __FUNCTION__, WSAGetLastError());
+        return;
+    }
+    std::list<SOCKADDR_IN> lstClientAddrs;
+    SOCKADDR_IN server = {}, client = {};
+    inet_pton(AF_INET, "127.0.0.1", &server.sin_addr);
+    server.sin_port = htons(30000);
+    server.sin_family = AF_INET;
+	socklen_t client_addr_size = sizeof(client);
+    if (bind(sock, (SOCKADDR*)&server, sizeof(server)) == SOCKET_ERROR)
+    {
+        printf("%s(%d):%s Server Socket Error(%d)\n", __FILE__, __LINE__, __FUNCTION__, WSAGetLastError());
+        closesocket(sock);
+        return;
+    }
+    char buf[4096] = "";
+    int ret = 0;
+    while (!_kbhit())
+    {
+        ret = recvfrom(sock, buf, sizeof(buf), 0, (SOCKADDR*)&client, &client_addr_size);
+        if (ret >= 0)
+        {
+            if (lstClientAddrs.empty())
+            {
+                lstClientAddrs.push_back(client);
+                //CUtils::Dump((BYTE*)buf, ret);
+                char ip[64] = { 0 };
+                inet_ntop(AF_INET, &client.sin_addr, ip, sizeof(ip));
+                printf("%s(%d):%s Server Receive From Host Client ip:[%s], port:[%d]\n", __FILE__, __LINE__, __FUNCTION__, ip, ntohs(client.sin_port));
+                ret = sendto(sock, buf, ret, 0, (SOCKADDR*)&client, client_addr_size);
+                printf("%s(%d):%s Server Socket Send To Host Client ret:[%d]\n", __FILE__, __LINE__, __FUNCTION__, ret);
+            }
+            else
+            {
+                memcpy(buf, &lstClientAddrs.front(), sizeof(SOCKADDR_IN));
+                ret = sendto(sock, buf, sizeof(SOCKADDR_IN), 0, (SOCKADDR*)&client, client_addr_size);
+                printf("%s(%d):%s Server Socket Send To Servant Client ret:[%d]\n", __FILE__, __LINE__, __FUNCTION__, ret);
+            }
+        }
+        else
+        {
+            printf("%s(%d):%s Server Socket Error(%d), ret:[%d]\n", __FILE__, __LINE__, __FUNCTION__, ret, WSAGetLastError());
+        }
+        Sleep(100);
+    }
+    closesocket(sock);
 }
 
 void udp_client(BOOL isHost)
 {
+
+    Sleep(2000);
+
+    SOCKADDR_IN servAddr = {};
+    inet_pton(AF_INET, "127.0.0.1", &servAddr.sin_addr);
+	servAddr.sin_family = AF_INET;
+	servAddr.sin_port = htons(30000);
+    SOCKET sock = socket(PF_INET, SOCK_DGRAM, 0);
+    socklen_t serv_addr_size = sizeof(servAddr);
+    int len = 0;
+    if (sock == INVALID_SOCKET)
+    {
+        printf("%s(%d):%s Server Socket Error(%d)\n",__FILE__, __LINE__, __FUNCTION__, WSAGetLastError());
+        return;
+    }
     if (isHost)
     {
-        printf("%s(%d):%s\n", __FILE__, __LINE__, __FUNCTION__);
+
+        std::string msg = "Hello UDP Server Hole punching From Host Client";
+        int ret = sendto(sock, msg.c_str(), msg.size(), 0, (SOCKADDR*)&servAddr, serv_addr_size);
+        printf("%s(%d):%s Host Client sendto Server ret:[%d]\n", __FILE__, __LINE__, __FUNCTION__, ret);
+        if (ret > 0)
+        {
+            ret = recvfrom(sock, (char*)msg.c_str(), msg.size(), 0, (SOCKADDR*)&servAddr, &serv_addr_size);
+            printf("%s(%d):%s Host Client recvfrom Server ret:[%d], msg:[%s]\n", __FILE__, __LINE__, __FUNCTION__, ret, msg.c_str());
+            if (ret > 0)
+            {
+                char ip[64] = { 0 };
+                inet_ntop(AF_INET, &servAddr.sin_addr, ip, sizeof(ip));
+                printf("%s(%d):%s Host Client Receive From Server ip:[%s], port:[%d]\n", __FILE__, __LINE__, __FUNCTION__, ip, ntohs(servAddr.sin_port));
+                msg.resize(1024, 0);
+            }
+
+            ret = recvfrom(sock, (char*)msg.c_str(), msg.size(), 0, (SOCKADDR*)&servAddr, &serv_addr_size);
+            printf("%s(%d):%s Host Client Socket recvfrom Peer ret:[%d], msg:[%s]\n", __FILE__, __LINE__, __FUNCTION__, ret, msg.c_str());
+            if (ret > 0)
+            {
+                char ip[64] = { 0 };
+                inet_ntop(AF_INET, &servAddr.sin_addr, ip, sizeof(ip));
+                printf("%s(%d):%s Host Receive From Peer ip:[%s], port:[%d]\n", __FILE__, __LINE__, __FUNCTION__, ip, ntohs(servAddr.sin_port));
+                msg.resize(1024, 0);
+            }
+        }
+
     }
     else
     {
-        printf("%s(%d):%s\n", __FILE__, __LINE__, __FUNCTION__);
+        Sleep(1000);
+
+        std::string msg = "Hello I'm Servant Client";
+        int ret = sendto(sock, msg.c_str(), msg.size(), 0, (SOCKADDR*)&servAddr, serv_addr_size);
+        printf("%s(%d):%s Servant Client sendto Server ret:[%d]\n", __FILE__, __LINE__, __FUNCTION__, ret);
+        if (ret > 0)
+        {
+            ret = recvfrom(sock, (char*)msg.c_str(), msg.size(), 0, (SOCKADDR*)&servAddr, &serv_addr_size);
+            printf("%s(%d):%s Servant Client recvfrom Server ret:[%d], msg:[%s]\n", __FILE__, __LINE__, __FUNCTION__, ret, msg.c_str());
+            if (ret > 0)
+            {
+                char ip[64] = { 0 };
+                inet_ntop(AF_INET, &servAddr.sin_addr, ip, sizeof(ip));
+                printf("%s(%d):%s Servant recvfrom Server ip:[%s], port:[%d]\n", __FILE__, __LINE__, __FUNCTION__, ip, ntohs(servAddr.sin_port));
+                //msg.resize(1024, 0);
+                SOCKADDR_IN* peerAddr = (SOCKADDR_IN*)msg.c_str();
+                inet_ntop(AF_INET, &peerAddr->sin_addr, ip, sizeof(ip));
+                //printf("%s(%d):%s Servant Receive From ip:[%s], port:[%d]\n", __FILE__, __LINE__, __FUNCTION__, ip, ntohs(peerAddr->sin_port));
+                //get peer addr send to peer client
+                char greeting[] = "Hello UDP Server Hole punching From Servant Client";
+                ret = sendto(sock, greeting, strlen(greeting), 0, (SOCKADDR*)peerAddr, sizeof(SOCKADDR_IN));
+                printf("%s(%d):%s Servant Client sendto Peer ret:[%d]\n", __FILE__, __LINE__, __FUNCTION__, ret);
+                Sleep(100);
+            }
+        }
+
     }
+    closesocket(sock);
 }
