@@ -20,6 +20,7 @@ CClientSocket::CClientSocket()
 	, m_nPort(0)
 	, m_isAutoClose(TRUE)
 	, m_nTid(UINT(-1))
+	, m_aRunning(FALSE)
 {
 	if (!InitSocketEnv())
 	{
@@ -53,7 +54,7 @@ CClientSocket::CClientSocket()
 		{
 			TRACE("Socket Message loop thread start failed\n");
 		}
-		CloseHandle(m_hEeventInvoke);
+		CloseHandle(m_hEeventInvoke); // reduce reference count
 	}
 	else
 	{
@@ -78,6 +79,7 @@ CClientSocket::CClientSocket(const CClientSocket& other)
 	m_mapMsgHandlers = other.m_mapMsgHandlers;
 	m_nTid = other.m_nTid;
 	m_hEeventInvoke = other.m_hEeventInvoke;
+	m_aRunning.store(other.m_aRunning.load());
 }
 
 CClientSocket& CClientSocket::operator=(const CClientSocket& other)
@@ -99,16 +101,21 @@ CClientSocket& CClientSocket::operator=(const CClientSocket& other)
 		m_mapMsgHandlers = other.m_mapMsgHandlers;
 		m_nTid = other.m_nTid;
 		m_hEeventInvoke = other.m_hEeventInvoke;
+		m_aRunning.store(other.m_aRunning.load());
 	}
 	return *this;
 }
 
 CClientSocket::~CClientSocket()
 {
-	WaitForSingleObject(m_hThread, 100);
+	m_aRunning.store(FALSE);
+	if (WaitForSingleObject(m_hThread, 500) != WAIT_OBJECT_0)
+	{
+		TerminateThread(m_hThread, 0);
+	}
+	m_hThread = INVALID_HANDLE_VALUE;
 	closesocket(m_socket);
 	WSACleanup();
-	TerminateThread(m_hThread, 0);
 }
 
 CClientSocket* CClientSocket::GetInstance()
@@ -215,7 +222,8 @@ void CClientSocket::ThreadMessageLoop()
 {
 	SetEvent(m_hEeventInvoke);
 	MSG msg;
-	while (::GetMessage(&msg, NULL, 0, 0))
+	m_aRunning.store(TRUE);
+	while (m_aRunning.load() && ::GetMessage(&msg, NULL, 0, 0))
 	{
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);

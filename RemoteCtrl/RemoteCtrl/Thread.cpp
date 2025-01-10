@@ -3,7 +3,7 @@
 
 CThread::CThread()
 {
-	m_bRunning = FALSE;
+	m_aRunning.store(FALSE);
 	m_hThread = INVALID_HANDLE_VALUE;
 	m_pWorker.store(NULL);
 }
@@ -34,18 +34,19 @@ BOOL CThread::IsValid()
 BOOL CThread::Start()
 {
 	m_hThread = (HANDLE)_beginthread(&CThread::ThreadEntry, 0, this);
-	if (IsValid()) m_bRunning = TRUE;
-	return m_bRunning;
+	if (IsValid()) m_aRunning.store(TRUE);
+	return m_aRunning.load();
 }
 
 BOOL CThread::Stop()
 {
-	m_bRunning = FALSE;
+	m_aRunning.store(FALSE);
 	// wait failed
-	if (WaitForSingleObject(m_hThread, 1000) != WAIT_OBJECT_0)
+	if (WaitForSingleObject(m_hThread, 500) != WAIT_OBJECT_0)
 	{
 		TerminateThread(m_hThread, 0);
 	}
+	m_hThread = INVALID_HANDLE_VALUE;
 	return TRUE;
 }
 
@@ -64,8 +65,8 @@ void CThread::UpdateWorker(const ::ThreadWorker& worker)
 
 void CThread::ThreadWorker()
 {
-	m_bRunning = TRUE;
-	while (m_bRunning)
+	m_aRunning.store(TRUE);
+	while (m_aRunning.load())
 	{
 		auto pWorker = m_pWorker.load();
 		if (!pWorker)

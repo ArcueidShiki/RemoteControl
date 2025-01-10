@@ -29,7 +29,7 @@ CWinApp theApp;
 
 using namespace std;
 
-#if __DEBUG_MODE
+#if 0
 // IOCP
 enum {
     IocpListEmpty,
@@ -361,6 +361,7 @@ int main(int argc, char *argv[])
     {
         return 1;
     }
+#endif
     CCommand cmd;
     switch (CServerSocket::GetInstance()->Run(&CCommand::RunCommand, &cmd))
     {
@@ -371,6 +372,5 @@ int main(int argc, char *argv[])
             MessageBox(NULL, _T("Cannot accept user, failed many time, program exit"), _T("Accept Client Failed!"), MB_OK | MB_ICONERROR);
             break;
     }
-#endif
     return 0;
 }

@@ -1,5 +1,11 @@
 #pragma once
 
+#define __DEBUG_MODE 1
+
+#if __DEBUG_MODE
+#include <vld.h>
+#endif
+
 #ifndef VC_EXTRALEAN
 #define VC_EXTRALEAN            // Exclude rarely-used stuff from Windows headers
 #endif

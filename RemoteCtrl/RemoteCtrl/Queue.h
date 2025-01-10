@@ -42,7 +42,7 @@ protected:
 	std::list<T> m_lstData;
 	HANDLE m_hCompletionPort;
 	HANDLE m_hThread;
-	std::atomic<BOOL> m_lock;
+	std::atomic<BOOL> m_aRunning;
 private:
 	static void ThreadEntry(void* arg); // arg: m_hCompletionPort
 	void ThreadQueue();
@@ -53,7 +53,7 @@ private:
 template<class T>
 inline CQueue<T>::CQueue()
 {
-	m_lock.store(FALSE);
+	m_aRunning.store(FALSE);
 	m_hThread = INVALID_HANDLE_VALUE;
 	m_hCompletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);
 	if (m_hCompletionPort && m_hCompletionPort != INVALID_HANDLE_VALUE)
@@ -65,21 +65,20 @@ inline CQueue<T>::CQueue()
 template<class T>
 inline CQueue<T>::~CQueue()
 {
-	if (m_lock.load())
+	if (m_aRunning.load())
 	{
 		return;
 	}
 	Clear();
-	m_lock.exchange(TRUE);
+	m_aRunning.exchange(TRUE);
 	// notify thread to exit
 	PostQueuedCompletionStatus(m_hCompletionPort, 0, NULL, NULL);
 	// wait for thread exit
-	if (WaitForSingleObject(m_hThread, 1000) != WAIT_OBJECT_0)
+	if (WaitForSingleObject(m_hThread, 500) != WAIT_OBJECT_0)
 	{
-
+		TerminateThread(m_hThread, 0);
 	}
-	TerminateThread(m_hThread, 0);
-	//CloseHandle(m_hThread);
+	m_hThread = INVALID_HANDLE_VALUE;
 	if (m_hCompletionPort && m_hCompletionPort != INVALID_HANDLE_VALUE)
 	{
 		HANDLE hTmp = m_hCompletionPort;
@@ -92,7 +91,7 @@ inline CQueue<T>::~CQueue()
 template<class T>
 inline BOOL CQueue<T>::PushBack(const T& data)
 {
-	if (m_lock.load())
+	if (m_aRunning.load())
 	{
 		return FALSE;
 	}
@@ -112,7 +111,7 @@ inline BOOL CQueue<T>::PushBack(const T& data)
 template<class T>
 inline BOOL CQueue<T>::PopFront(T& data)
 {
-	if (m_lock.load())
+	if (m_aRunning.load())
 	{
 		return FALSE;
 	}
@@ -142,7 +141,7 @@ inline BOOL CQueue<T>::PopFront(T& data)
 template<class T>
 inline size_t CQueue<T>::Size()
 {
-	if (m_lock.load())
+	if (m_aRunning.load())
 	{
 		return -1;
 	}
@@ -178,7 +177,7 @@ inline size_t CQueue<T>::Size()
 template<class T>
 inline BOOL CQueue<T>::Clear()
 {
-	if (m_lock.load())
+	if (m_aRunning.load())
 	{
 		return FALSE;
 	}

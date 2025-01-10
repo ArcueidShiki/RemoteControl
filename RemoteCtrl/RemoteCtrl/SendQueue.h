@@ -35,7 +35,7 @@ inline SendQueue<T>::SendQueue(ThreadFuncBase* obj, CB callback)
 template<class T>
 inline SendQueue<T>::~SendQueue()
 {
-	if (CQueue<T>::m_lock.load()) return;
+	if (CQueue<T>::m_aRunning.load()) return;
 	CQueue<T>::Clear();
 	m_base = NULL;
 	m_callback = NULL;
@@ -45,7 +45,7 @@ inline SendQueue<T>::~SendQueue()
 template<class T>
 inline BOOL SendQueue<T>::PopFront()
 {
-	if (CQueue<T>::m_lock.load())
+	if (CQueue<T>::m_aRunning.load())
 	{
 		return FALSE;
 	}

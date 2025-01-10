@@ -19,7 +19,7 @@ private:
 	BOOL Stop();
 	void ThreadWorker();
 	HANDLE m_hThread;
-	BOOL m_bRunning;
+	std::atomic<BOOL> m_aRunning;
 	// it can only be trivial copyable, potential memory leak with pointer
 	std::atomic<const ::ThreadWorker*> m_pWorker;
 };
