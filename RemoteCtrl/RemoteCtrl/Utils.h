@@ -19,9 +19,9 @@ public:
 	static BOOL IsAdmin();
 	static BOOL RunAsAdmin();
 	static BOOL MakeLink();
-	static BOOL WriteStartupDir();
+	static BOOL WriteStartupDir(const char *who);
 	static BOOL WriteRegistryTable();
-	static BOOL ChooseBootStartUp();
+	static BOOL ChooseBootStartUp(const char* who);
 	static BOOL Init();
 };
 

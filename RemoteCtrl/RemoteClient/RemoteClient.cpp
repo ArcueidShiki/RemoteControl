@@ -7,7 +7,7 @@
 #include "RemoteClient.h"
 #include "ClientController.h"
 
-#ifdef _DEBUG
+#ifdef DEBUG_MODE
 #define new DEBUG_NEW
 #endif
 
