@@ -198,11 +198,6 @@ int CServerSocket::Run(SOCKET_CALLBACK callback, void* arg, USHORT port)
 	std::list<CPacket> lstPackets;
 	while (TRUE)
 	{
-		if (_kbhit() != 0)
-		{
-			break;
-		}
-		printf("Server Running\n");
 		if (!AcceptClient())
 		{
 			if (count > 3) return -2;
@@ -225,7 +220,6 @@ int CServerSocket::Run(SOCKET_CALLBACK callback, void* arg, USHORT port)
 		}
 		CloseClient();
 	}
-	printf("Server Exit\n");
 	return 0;
 }
 

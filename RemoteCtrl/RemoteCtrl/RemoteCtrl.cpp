@@ -362,6 +362,9 @@ int main(int argc, char *argv[])
         return 1;
     }
 #endif
+    Server server;
+	server.StartService();
+#if 0
     CCommand cmd;
     switch (CServerSocket::GetInstance()->Run(&CCommand::RunCommand, &cmd))
     {
@@ -373,4 +376,5 @@ int main(int argc, char *argv[])
             break;
     }
     return 0;
+#endif
 }

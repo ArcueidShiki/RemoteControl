@@ -13,6 +13,8 @@ Server::Server(ULONG ip, USHORT port) : m_pool(10)
 	m_addr.sin_addr.S_un.S_addr = htonl(ip);
 	m_addr.sin_port = htons(port);
 	m_worker = ThreadWorker();
+	m_spCmd = std::make_shared<Command>();
+	m_cmdHandler = &Command::RunCommand;
 }
 
 Server::~Server()
@@ -37,47 +39,48 @@ void Server::InitSocket()
 	setsockopt(m_socket, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt));
 }
 
+inline BOOL Server::SocketError()
+{
+	closesocket(m_socket);
+	m_socket = INVALID_SOCKET;
+	return FALSE;
+}
+
 BOOL Server::StartService()
 {
 	InitSocket();
 	if (bind(m_socket, (SOCKADDR*)&m_addr, sizeof(m_addr)) == -1)
 	{
-		closesocket(m_socket);
-		m_socket = INVALID_SOCKET;
-		return FALSE;
+		return SocketError();
 	}
 	if (listen(m_socket, 3) == -1)
 	{
-		closesocket(m_socket);
-		m_socket = INVALID_SOCKET;
-		return FALSE;
+		return SocketError();
 	}
-
 	m_hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
 	if (!m_hIOCP || m_hIOCP == INVALID_HANDLE_VALUE)
 	{
-		closesocket(m_socket);
-		m_socket = INVALID_SOCKET;
 		m_hIOCP = INVALID_HANDLE_VALUE;
-		return FALSE;
+		return SocketError();
 	}
 	// bind socket with iocp
 	CreateIoCompletionPort((HANDLE)m_socket, m_hIOCP, (ULONG_PTR)this, 0);
 	m_worker = ThreadWorker(this, (FUNC)&Server::IOCPLoop);
 	m_pool.Invoke();
+	// thread pool dispatch worker with new connection request pool size defalut 10
 	m_pool.DispatchWorker(m_worker);
 	return NewAccept();
 }
 
 BOOL Server::NewAccept()
 {
-	PCLIENT pClient = std::make_shared<Client>();
+	PCLIENT pClient = std::make_shared<Client>(m_spCmd);
 	pClient->SetOverlapped(pClient.get());
 	m_mapClients.insert(std::pair<SOCKET, PCLIENT>(pClient->GetSocket(), pClient));
 	// async accept
 	if (!AcceptEx(
-		m_socket,
-		pClient->GetSocket(),
+		m_socket,	// server bind and listen socket 
+		pClient->GetSocket(), // accpeted client socket
 		pClient->GetBuffer(),
 		0, // 0 means no additional data is received, after connection is built
 		sizeof(SOCKADDR_IN) + 16,
@@ -90,10 +93,8 @@ BOOL Server::NewAccept()
 		{
 			TRACE("AcceptEx failed with error: %d\n", err);
 			closesocket(m_socket);
-			CloseHandle(m_hIOCP);
-			m_socket = INVALID_SOCKET;
 			m_hIOCP = INVALID_HANDLE_VALUE;
-			return FALSE;
+			return SocketError();
 		}
 		Sleep(1);
 	}
@@ -115,24 +116,25 @@ INT Server::IOCPLoop()
 	{
 		if (CompletionKey != 0)
 		{
-			// socket has IO event
 			COverlapped *pOverlapped = CONTAINING_RECORD(lpOverlapped, COverlapped, m_overlapped);
-			//TRACE("Server recv overlapped opt: %lu\n", pOverlapped->m_operator);
 			pOverlapped->m_server = this;
 			switch (pOverlapped->m_operator)
 			{
+				// server socket has IO accept event occured
 				case Operator::OP_ACCEPT:
 				{	// may have pointer offset with base class
 					ACCEPT_OVERLAPPED* pOver = (ACCEPT_OVERLAPPED*)pOverlapped;
 					m_pool.DispatchWorker(pOver->m_worker);	// AcceptWorker, When worker finished
 				}
 					break;
+				// one client socket in map has recv IO event occured
 				case Operator::OP_RECV:
 				{
 					RECV_OVERLAPPED* pOver = (RECV_OVERLAPPED*)pOverlapped;
 					m_pool.DispatchWorker(pOver->m_worker);
 				}
 					break;
+				// one client socket in map has send IO event occured
 				case Operator::OP_SEND:
 				{
 					SEND_OVERLAPPED* pOver = (SEND_OVERLAPPED*)pOverlapped;
