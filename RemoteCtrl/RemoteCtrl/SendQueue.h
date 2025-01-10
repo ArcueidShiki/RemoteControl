@@ -12,10 +12,9 @@ protected:
 	// using timer to auto pop dispatch message instead of parent popfront
 	BOOL PopFront();
 	// prohibit this popfront function.
-	virtual BOOL PopFront(T& data) { return FALSE; }
+	//virtual BOOL PopFront(T& data) { return FALSE; }
 	virtual void HandleOpt(typename CQueue<T>::Q_IOCP_PARAM* pParam);
 	virtual void HandlePop(typename CQueue<T>::Q_IOCP_PARAM* pParam);
-	int ThreadTick();
 private:
 	ThreadFuncBase* m_base;
 	CB m_callback;
@@ -29,9 +28,9 @@ inline SendQueue<T>::SendQueue(ThreadFuncBase* obj, CB callback)
 {
 	m_base = obj;
 	m_callback = callback;
-	m_thread.Start();
-	m_worker = ThreadWorker(this, (FUNC)&SendQueue<T>::ThreadTick);
-	m_thread.UpdateWorker(m_worker);
+	//m_thread.Start();
+	//m_worker = ThreadWorker(this, (FUNC)&SendQueue<T>::ThreadTick);
+	//m_thread.UpdateWorker(m_worker);
 }
 
 template<class T>
@@ -51,11 +50,11 @@ inline BOOL SendQueue<T>::PopFront()
 	{
 		return FALSE;
 	}
-	typename CQueue<T>::Q_IOCP_PARAM* pParam = new typename CQueue<T>::Q_IOCP_PARAM(CQueue<T>::QPOP, T());
+	auto pParam = typename CQueue<T>::Q_IOCP_PARAM(CQueue<T>::QPOP, T());
 	if (!PostQueuedCompletionStatus(CQueue<T>::m_hCompletionPort,
 		sizeof(CQueue<T>::Q_IOCP_PARAM), (ULONG_PTR)&pParam, NULL))
 	{
-		delete pParam;
+		//delete pParam;
 		return FALSE;
 	}
 	// pop one packet,
@@ -89,19 +88,19 @@ inline void SendQueue<T>::HandlePop(typename CQueue<T>::Q_IOCP_PARAM* pParam)
 			CQueue<T>::m_lstData.pop_front();
 		}
 	}
-	delete pParam;
+	//delete pParam;
 }
 
-template<class T>
-inline int SendQueue<T>::ThreadTick()
-{
-	// thread is is running
-	BOOL workerThreadRunning = WaitForSingleObject(CQueue<T>::m_hThread, 0) == WAIT_TIMEOUT;
-	if (!workerThreadRunning) return -1;
-	while (TRUE)
-	{
-		PopFront(); // post message to iocp
-		Sleep(1);
-	}
-	return 0;
-}
+//template<class T>
+//inline int SendQueue<T>::ThreadTick()
+//{
+//	// thread is is running
+//	BOOL workerThreadRunning = WaitForSingleObject(CQueue<T>::m_hThread, 0) == WAIT_TIMEOUT;
+//	if (!workerThreadRunning) return -1;
+//	while (TRUE)
+//	{
+//		PopFront(); // post message to iocp
+//		Sleep(1);
+//	}
+//	return 0;
+//}

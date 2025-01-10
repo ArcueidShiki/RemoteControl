@@ -86,6 +86,7 @@ inline AcceptOverlapped<op>::AcceptOverlapped()
 	m_worker = ThreadWorker(this, (FUNC)&AcceptOverlapped<op>::AcceptWorker);
 }
 
+// Too many accept and send workers are running
 template<Operator op>
 inline int AcceptOverlapped<op>::AcceptWorker()
 {
@@ -102,25 +103,8 @@ inline int AcceptOverlapped<op>::AcceptWorker()
 			(SOCKADDR**)m_client->GetRemoteAddr(), &rLength);
 		// add accepted client socket to IOCP handle
 		m_server->BindNewSocket(m_client->GetSocket());
-		int ret = WSARecv(
-			m_client->GetSocket(),
-			m_client->GetRecvWSABuf(),
-			1,
-			m_client->GetReceived(),
-			m_client->GetFlags(),
-			m_client->GetRecvOverLapped(),
-			NULL);
-		if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING)
-		{
-			// 997 WSA_IO_PENDING is not considered as an error in nonblock mode.
-			TRACE("WSARecv failed with error: %d\n", WSAGetLastError());
-			CUtils::ShowError();
-			return -1;
-		}
-		if (!m_server->NewAccept())
-		{
-			return -1;
-		}
+		m_client->Recv(); // jump to recv worker
+		m_server->NewAccept();
 	}
 	// ret < 0 end worker.
 	return -1;
@@ -142,7 +126,8 @@ template<Operator op>
 inline int RecvOverlapped<op>::RecvWorker()
 {
 	if (!m_client) return -1;
-	return m_client->Recv();
+	m_client->Send(); // jump to send worker
+	return -1;
 }
 
 template<Operator op>
@@ -160,10 +145,17 @@ inline SendOverlapped<op>::SendOverlapped()
 template<Operator op>
 inline int SendOverlapped<op>::SendWorker()
 {
-	if (!m_client) return -1;
-	// Send Action won't complete immediately
-	// TODO
-	return 0;
+	while (m_client && m_client->GetSocket() != INVALID_SOCKET)
+	{
+		if (m_client->Send() != 0)
+		{
+			Sleep(100);
+		}
+	}
+	// jump back to recv worker
+	// send finish, close client socket
+	m_server->NewAccept(); // jump to accept worker
+	return -1;
 }
 
 template<Operator op>
@@ -182,5 +174,6 @@ inline ErrorOverlapped<op>::ErrorOverlapped()
 template<Operator op>
 inline int ErrorOverlapped<op>::ErrorWorker()
 {
+	m_server->NewAccept();
 	return 0;
 }

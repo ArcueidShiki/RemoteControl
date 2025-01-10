@@ -364,6 +364,10 @@ int main(int argc, char *argv[])
 #endif
     Server server;
 	server.StartService();
+    while (_kbhit() == 0)
+	{
+		Sleep(10000000);
+	}
 #if 0
     CCommand cmd;
     switch (CServerSocket::GetInstance()->Run(&CCommand::RunCommand, &cmd))

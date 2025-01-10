@@ -14,7 +14,6 @@ Server::Server(ULONG ip, USHORT port) : m_pool(10)
 	m_addr.sin_port = htons(port);
 	m_worker = ThreadWorker();
 	m_spCmd = std::make_shared<Command>();
-	m_cmdHandler = &Command::RunCommand;
 }
 
 Server::~Server()
@@ -76,6 +75,7 @@ BOOL Server::NewAccept()
 {
 	PCLIENT pClient = std::make_shared<Client>(m_spCmd);
 	pClient->SetOverlapped(pClient.get());
+	// when to erase, otherwise it will expand expoentially
 	m_mapClients.insert(std::pair<SOCKET, PCLIENT>(pClient->GetSocket(), pClient));
 	// async accept
 	if (!AcceptEx(
@@ -86,7 +86,7 @@ BOOL Server::NewAccept()
 		sizeof(SOCKADDR_IN) + 16,
 		sizeof(SOCKADDR_IN) + 16,
 		pClient->GetReceived(),
-		pClient->GetAcceptOverlapped()))
+		pClient->GetAcceptOverlapped())) // if success jump to accept worker
 	{
 		int err = WSAGetLastError();
 		if (err != WSA_IO_PENDING)

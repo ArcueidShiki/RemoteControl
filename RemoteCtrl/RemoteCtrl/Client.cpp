@@ -3,12 +3,10 @@
 #include "Utils.h"
 
 constexpr int BUF_SIZE = 4096;
-
-using SEND_CALLBACK = SendQueue<CPacket>::CB;
+CQueue<CPacket>* CQueue<CPacket>::m_instance = NULL;
+CQueue<CPacket>::CHelper CQueue<CPacket>::m_helper;
 
 Client::Client(CMD_SPTR &cmd, CMD_CB callback)
-					// send queue popfront callback
-	: m_qSend(this, (SEND_CALLBACK)&Client::SendData)
 {
 	m_socket = WSASocketW(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 	m_buffer.resize(BUF_SIZE, 0);
@@ -24,8 +22,8 @@ Client::Client(CMD_SPTR &cmd, CMD_CB callback)
 	m_used = 0;
 	m_lock.store(FALSE);
 	m_spCmd = cmd;
-	m_cmdHandler = callback;
 	m_sent = 0;
+	m_queue = CQueue<CPacket>::GetInstance();
 }
 
 Client::~Client()
@@ -38,7 +36,7 @@ Client::~Client()
 	m_recv.reset();
 	m_send.reset();
 	m_error.reset();
-	m_qSend.Clear();
+	//m_queue->Clear();
 }
 
 int Client::Recv()
@@ -49,28 +47,31 @@ int Client::Recv()
 	TRACE("Get : [%lu] Bytes From Client; recv buff position:[%p], buf size:[%zu]\n", m_received, m_recv->m_buffer.data(), m_recv->m_buffer.size());
 	TRACE("Get : [%lu] Bytes From Client; recv  wsabuff position:[%p], wsabuf size:[%zu]\n", m_received, m_recv->m_wsabuf.buf, m_recv->m_wsabuf.len);
 #endif
-	// already get buf from WSARecv
-	m_used = m_received;
+	int ret = WSARecv(
+			m_socket,
+			&m_recv->m_wsabuf,
+			1,
+			&m_received,
+			&m_flags,
+			&m_recv->m_overlapped, // to go recv overlapped
+			NULL);
+	if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING)
+	{
+		// 997 WSA_IO_PENDING is not considered as an error in nonblock mode.
+		TRACE("WSARecv failed with error: %d\n", WSAGetLastError());
+		CUtils::ShowError();
+		return -1;
+	}
 	int cmd = ParseCommand();
 	if (cmd > 0)
 	{
-		std::list<CPacket> lstPackets;
-		CPacket inPacket;
 		// command using nCmd + incoming packet(msg from client)
 		// push ack packets got from Command to send queue.
-		m_spCmd->ExecuteCommand(cmd, m_qSend, inPacket);
+		m_spCmd->ExecuteCommand(cmd, *m_queue, m_packet);
+		Send();
+		return cmd;
 	}
-	return -1;
-}
-
-// not used
-int Client::Send(void* buf, size_t size)
-{
-	if (m_qSend.PushBack(CPacket((BYTE*)buf, size)))
-	{
-		return 0;
-	}
-	return -1;
+	return ret;
 }
 
 void Client::SetOverlapped(Client* ptr)
@@ -82,30 +83,40 @@ void Client::SetOverlapped(Client* ptr)
 }
 
 // from send queue callback jump to here.
-int Client::SendData(CPacket &packet)
+int Client::Send()
 {
-	// copy packet to wsa send buffer;
-	int ret = WSASend(m_socket, GetSendWSABuf(),
-		1, &m_sent, m_flags, &m_send->m_overlapped, NULL);
-	if (ret != 0)
+	while (m_queue->Size() > 0)
 	{
-		int err = WSAGetLastError();
-		if (err != WSA_IO_PENDING)
+		// copy packet to wsa send buffer;
+		CPacket packet;
+		if (!m_queue->PopFront(packet))
 		{
-			TRACE("Client, Send Queue err: %d\n", err);
-			CUtils::ShowError();
-			return ret;
+			return -1;
 		}
+		memset(m_send->m_wsabuf.buf, 0, m_send->m_wsabuf.len);
+		memcpy(m_send->m_wsabuf.buf, packet.GetData(), packet.Size());
+		int ret = WSASend(m_socket, GetSendWSABuf(),
+			1, &m_sent, m_flags, &m_send->m_overlapped, NULL);
+		if (ret != 0)
+		{
+			int err = WSAGetLastError();
+			if (err != WSA_IO_PENDING)
+			{
+				TRACE("Client, Send Queue err: %d\n", err);
+				CUtils::ShowError();
+			}
+		}
+		return ret;
 	}
-	return 0;
+	return -1;
 }
 
-inline SOCKET Client::GetSocket() const
+ SOCKET Client::GetSocket() const
 {
 	return m_socket;
 }
 
-PVOID Client::GetBuffer()
+ PVOID Client::GetBuffer()
 {
 	return (void*)m_buffer.data();
 }
@@ -128,6 +139,19 @@ LPOVERLAPPED Client::GetSendOverLapped()
 LPOVERLAPPED Client::GetErrorOverLapped()
 {
 	return &m_error->m_overlapped;
+}
+
+int Client::ProcessCommand()
+{
+	int cmd = ParseCommand();
+	if (cmd > 0)
+	{
+		// command using nCmd + incoming packet(msg from client)
+		// push ack packets got from Command to send queue.
+		m_spCmd->ExecuteCommand(cmd, *m_queue, m_packet);
+		return cmd;
+	}
+	return -1;
 }
 
 int Client::ParseCommand()
@@ -157,49 +181,49 @@ int Client::ParseCommand()
 			return m_packet.sCmd;
 		}
 		// if cannot parse a packet, continue receiving.
-		int ret = WSARecv(
-			m_socket,
-			&m_recv->m_wsabuf,
-			1,
-			&m_received,
-			&m_flags,
-			&m_recv->m_overlapped,
-			NULL);
+		//int ret = WSARecv(
+		//	m_socket,
+		//	&m_recv->m_wsabuf,
+		//	1,
+		//	&m_received,
+		//	&m_flags,
+		//	&m_recv->m_overlapped,
+		//	NULL);
 	}
 	return -1;
 }
 
-LPDWORD Client::GetReceived()
+ LPDWORD Client::GetReceived()
 {
 	return &m_received;
 }
 
-SOCKADDR_IN** Client::GetLocalAddr()
+ SOCKADDR_IN** Client::GetLocalAddr()
 {
 	return &m_laddr;
 }
 
-SOCKADDR_IN** Client::GetRemoteAddr()
+ SOCKADDR_IN** Client::GetRemoteAddr()
 {
 	return &m_raddr;
 }
 
-size_t Client::GetBufSize()
+ size_t Client::GetBufSize()
 {
 	return m_buffer.size();
 }
 
-LPDWORD Client::GetFlags()
+ LPDWORD Client::GetFlags()
 {
 	return &m_flags;
 }
 
-LPWSABUF Client::GetRecvWSABuf()
+ LPWSABUF Client::GetRecvWSABuf()
 {
 	return &m_recv->m_wsabuf;
 }
 
-LPWSABUF Client::GetSendWSABuf()
+ LPWSABUF Client::GetSendWSABuf()
 {
 	return &m_send->m_wsabuf;
 }

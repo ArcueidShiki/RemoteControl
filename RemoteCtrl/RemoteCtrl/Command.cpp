@@ -418,7 +418,7 @@ Command::~Command()
 {
 }
 
-int Command::ExecuteCommand(int nCmd, SendQueue<CPacket>& sendQueue, CPacket& inPacket)
+int Command::ExecuteCommand(int nCmd, CQueue<CPacket>& queue, CPacket& inPacket)
 {
     std::map<int, CMD_CALLBACK>::iterator it = m_mapCmd.find(nCmd);
     if (it == m_mapCmd.end())
@@ -426,15 +426,15 @@ int Command::ExecuteCommand(int nCmd, SendQueue<CPacket>& sendQueue, CPacket& in
         return -1;
     }
     // it->second is CMDFUNC type point to one member function.
-    return (this->*(it->second))(sendQueue, inPacket);
+    return (this->*(it->second))(queue, inPacket);
 }
 
-void Command::RunCommand(void* obj, int nCmd, SendQueue<CPacket>& sendQueue, CPacket& inPacket)
+void Command::RunCommand(void* obj, int nCmd, CQueue<CPacket>& queue, CPacket& inPacket)
 {
     Command* instance = (Command*)obj;
     if (nCmd > 0)
     {
-        int ret = instance->ExecuteCommand(nCmd, sendQueue, inPacket);
+        int ret = instance->ExecuteCommand(nCmd, queue, inPacket);
         if (ret != 0)
         {
             // failed when download file.
@@ -447,7 +447,7 @@ void Command::RunCommand(void* obj, int nCmd, SendQueue<CPacket>& sendQueue, CPa
     }
 }
 
-int Command::MakeDriverInfo(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
+int Command::MakeDriverInfo(CQueue<CPacket>& queue, CPacket& inPacket)
 {
     std::string result;
     for (int i = 1; i <= 26; i++)
@@ -459,11 +459,11 @@ int Command::MakeDriverInfo(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
             result += 'A' + i - 1;
         }
     }
-    sendQueue.PushBack(CPacket(CMD_DRIVER, (BYTE*)result.c_str(), result.size()));
+    queue.PushBack(CPacket(CMD_DRIVER, (BYTE*)result.c_str(), result.size()));
     return 0;
 }
 
-int Command::MakeDirectoryInfo(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
+int Command::MakeDirectoryInfo(CQueue<CPacket>& queue, CPacket& inPacket)
 {
     std::string strPath = inPacket.strData;
     if (_chdir(strPath.c_str()) != 0)
@@ -472,7 +472,7 @@ int Command::MakeDirectoryInfo(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
         FILEINFO finfo(FALSE, TRUE, FALSE, strPath.c_str());
         memcpy(finfo.szFileName, strPath.c_str(), strPath.size());
         OutputDebugString(_T("No permission to access the directory\n"));
-        sendQueue.PushBack(CPacket(CMD_DIR, (BYTE*)&finfo, sizeof(finfo)));
+        queue.PushBack(CPacket(CMD_DIR, (BYTE*)&finfo, sizeof(finfo)));
         return -2;
     }
     _finddata_t fdata;
@@ -482,7 +482,7 @@ int Command::MakeDirectoryInfo(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
     {
         FILEINFO finfo(FALSE, TRUE, FALSE, strPath.c_str());
         OutputDebugString(_T("No files in the directory\n"));
-        sendQueue.PushBack(CPacket(CMD_DIR, (BYTE*)&finfo, sizeof(finfo)));
+        queue.PushBack(CPacket(CMD_DIR, (BYTE*)&finfo, sizeof(finfo)));
         return -3;
     }
     int ret;
@@ -491,7 +491,7 @@ int Command::MakeDirectoryInfo(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
         FILEINFO finfo;
         finfo.IsDirectory = fdata.attrib & _A_SUBDIR;
         memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
-        sendQueue.PushBack(CPacket(CMD_DIR, (BYTE*)&finfo, sizeof(finfo)));
+        queue.PushBack(CPacket(CMD_DIR, (BYTE*)&finfo, sizeof(finfo)));
 #if 0
         TRACE("Server Send filename id : [%d], name: [%s], HasNext: [%d]\r\n", ++id, fdata.name, finfo.HasNext);
 #endif
@@ -501,20 +501,20 @@ int Command::MakeDirectoryInfo(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
     FILEINFO finfo;
     // tell client, end.
     finfo.HasNext = FALSE;
-    sendQueue.PushBack(CPacket(CMD_DIR, (BYTE*)&finfo, sizeof(finfo)));
+    queue.PushBack(CPacket(CMD_DIR, (BYTE*)&finfo, sizeof(finfo)));
     _findclose(hfind);
     return 0;
 }
 
-int Command::RunFile(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
+int Command::RunFile(CQueue<CPacket>& queue, CPacket& inPacket)
 {
     std::string strPath = inPacket.strData;
     ShellExecuteA(NULL, NULL, strPath.c_str(), NULL, NULL, SW_SHOWNORMAL);
-    sendQueue.PushBack(CPacket(CMD_RUN_FILE, NULL, 0));
+    queue.PushBack(CPacket(CMD_RUN_FILE, NULL, 0));
     return 0;
 }
 
-int Command::DownloadFile(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
+int Command::DownloadFile(CQueue<CPacket>& queue, CPacket& inPacket)
 {
 #define DLD_BUF_SIZE 1024 // local scope macro, is not accessible globally.
     std::string strPath = inPacket.strData;
@@ -526,7 +526,7 @@ int Command::DownloadFile(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
     errno_t err = fopen_s(&pFile, strPath.c_str(), "rb");
     if (err != 0)
     {
-        sendQueue.PushBack(CPacket(CMD_DLD_FILE, (BYTE*)&size, sizeof(size)));
+        queue.PushBack(CPacket(CMD_DLD_FILE, (BYTE*)&size, sizeof(size)));
         TRACE("Open File failed filename:[%s], name len: %zu\n", strPath.c_str(), strPath.size());
         return -1;
     }
@@ -536,20 +536,20 @@ int Command::DownloadFile(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
         fseek(pFile, 0, SEEK_END);
         size = _ftelli64(pFile);
         TRACE("Server Filename:[%s], size:[%lld]\n", strPath.c_str(), size);
-        sendQueue.PushBack(CPacket(CMD_DLD_FILE, (BYTE*)&size, sizeof(size)));
+        queue.PushBack(CPacket(CMD_DLD_FILE, (BYTE*)&size, sizeof(size)));
         fseek(pFile, 0, SEEK_SET);
         char buf[DLD_BUF_SIZE] = "";
         size_t rlen = 0;
         do {
             rlen = fread(buf, 1, DLD_BUF_SIZE, pFile);
-            sendQueue.PushBack(CPacket(CMD_DLD_FILE, (BYTE*)buf, rlen));
+            queue.PushBack(CPacket(CMD_DLD_FILE, (BYTE*)buf, rlen));
         } while (rlen >= DLD_BUF_SIZE);
         fclose(pFile);
     }
     return 0;
 }
 
-int Command::DelFile(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
+int Command::DelFile(CQueue<CPacket>& queue, CPacket& inPacket)
 {
     std::string strPath = inPacket.strData;
     TRACE("strPath: [%s]\n", strPath.c_str());
@@ -576,11 +576,11 @@ int Command::DelFile(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
         TRACE("DeleteFileW failed, error code: %d\n", GetLastError());
     }
     DeleteFileA(strPath.c_str());
-    sendQueue.PushBack(CPacket(CMD_DEL_FILE, NULL, 0));
+    queue.PushBack(CPacket(CMD_DEL_FILE, NULL, 0));
     return 0;
 }
 
-int Command::MouseEvent(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
+int Command::MouseEvent(CQueue<CPacket>& queue, CPacket& inPacket)
 {
     MOUSEEV mouse;
     memcpy(&mouse, inPacket.strData.c_str(), sizeof(MOUSEEV));
@@ -607,11 +607,11 @@ int Command::MouseEvent(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
         case MOUSE_MOVE: MouseMove(mouse); break;
 	    default: break;
     }
-    sendQueue.PushBack(CPacket(CMD_MOUSE, NULL, 0));
+    queue.PushBack(CPacket(CMD_MOUSE, NULL, 0));
     return 0;
 }
 
-int Command::SendScreen(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
+int Command::SendScreen(CQueue<CPacket>& queue, CPacket& inPacket)
 {
     CImage screen; // GDI: Global Device Interface
     HDC hScreen = ::GetDC(NULL); // device context
@@ -643,7 +643,7 @@ int Command::SendScreen(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
     pStream->Seek(li, STREAM_SEEK_SET, NULL);
     PBYTE pData = (PBYTE)GlobalLock(hMem);
     SIZE_T nSize = GlobalSize(hMem);
-    sendQueue.PushBack(CPacket(CMD_SEND_SCREEN, pData, nSize));
+    queue.PushBack(CPacket(CMD_SEND_SCREEN, pData, nSize));
     GlobalUnlock(hMem);
     pStream->Release();
     GlobalFree(hMem);
@@ -652,24 +652,24 @@ int Command::SendScreen(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
 
 }
 
-int Command::LockMachine(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
+int Command::LockMachine(CQueue<CPacket>& queue, CPacket& inPacket)
 {
     if (dlg.m_hWnd == NULL || dlg.m_hWnd == INVALID_HANDLE_VALUE)
     {
         _beginthreadex(NULL, 0, &Command::ThreadLockDlg, this, 0, &tid);
         TRACE("Thread id = %u\n", tid);
     }
-    sendQueue.PushBack(CPacket(CMD_LOCK_MACHINE, NULL, 0));
+    queue.PushBack(CPacket(CMD_LOCK_MACHINE, NULL, 0));
     return 0;
 
 }
 
-int Command::UnlockMachine(SendQueue<CPacket>& sendQueue, CPacket& inPacket)
+int Command::UnlockMachine(CQueue<CPacket>& queue, CPacket& inPacket)
 {
     // simulate press ESC
     PostThreadMessage(tid, WM_KEYDOWN, VK_ESCAPE, 0x00010001);
     // send back to client
-    sendQueue.PushBack(CPacket(CMD_UNLOCK_MACHINE, NULL, 0));
+    queue.PushBack(CPacket(CMD_UNLOCK_MACHINE, NULL, 0));
     return 0;
 }
 

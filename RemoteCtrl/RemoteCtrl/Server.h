@@ -30,5 +30,4 @@ private:
 	ThreadWorker m_worker;
 	// member cmd callback, and its pointer
 	CMD_SPTR m_spCmd;
-	CMD_CB m_cmdHandler;
 };

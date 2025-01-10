@@ -2,19 +2,19 @@
 // template better define in header: visibility, linking, code reuse
 #include <list>
 #include <atomic>
+#include <mutex>
 #include "Thread.h"
+#include "Packet.h"
 
 template<class T>
 class CQueue
 {
 public:
-	CQueue();
-	virtual ~CQueue();
 	BOOL PushBack(const T& data);
 	virtual BOOL PopFront(T& data);
 	BOOL Clear();
 	size_t Size();
-
+	static CQueue<T>* GetInstance();
 	enum {
 		QNONE,
 		QPUSH,
@@ -26,10 +26,10 @@ public:
 	// POST parameter for IOCP message
 	typedef struct IocpParam
 	{
-		int nOpt;
+		size_t nOpt;
 		T data;
 		HANDLE hEvent; // for pop operation
-		IocpParam(int nOpt, const T& data, HANDLE event = NULL)
+		IocpParam(size_t nOpt, const T& data, HANDLE event = NULL)
 			: nOpt(nOpt)
 			, data(data)
 			, hEvent(event) {}
@@ -55,6 +55,24 @@ protected:
 private:
 	static void ThreadEntry(void* instance);
 	void ThreadQueue();
+	CQueue();
+	virtual ~CQueue();
+	class CHelper {
+	public:
+		CHelper()
+		{
+			GetInstance();
+		}
+		~CHelper()
+		{
+			ReleaseInstance();
+		}
+	};
+private:
+	static CHelper m_helper;
+	static CQueue<T>* m_instance;
+	static void ReleaseInstance();
+	std::mutex m_lock;
 };
 
 // T no explicit instantiation
@@ -80,10 +98,11 @@ inline CQueue<T>::~CQueue()
 	// notify ThreadQueue to exit
 	PostQueuedCompletionStatus(m_hCompletionPort, 0, NULL, NULL);
 	// wait for thread exit
-	if (WaitForSingleObject(m_hThread, 500) != WAIT_OBJECT_0)
-	{
-		TerminateThread(m_hThread, 0);
-	}
+	//if (WaitForSingleObject(m_hThread, 500) != WAIT_OBJECT_0)
+	//{
+	//	TerminateThread(m_hThread, 0);
+	//}
+	TerminateThread(m_hThread, 0);
 	m_hThread = INVALID_HANDLE_VALUE;
 	if (m_hCompletionPort && m_hCompletionPort != INVALID_HANDLE_VALUE)
 	{
@@ -92,6 +111,16 @@ inline CQueue<T>::~CQueue()
 		CloseHandle(hTmp);
 	}
 	m_lstData.clear();
+}
+
+template<typename CPacket>
+inline void CQueue<CPacket>::ReleaseInstance()
+{
+	if (m_instance != NULL)
+	{
+		delete m_instance;
+		m_instance = NULL;
+	}
 }
 
 template<class T>
@@ -110,16 +139,25 @@ inline BOOL CQueue<T>::PushBack(const T& data)
 template<class T>
 inline BOOL CQueue<T>::PopFront(T& data)
 {
-	if (!IsValid()) return FALSE;
+	if (!IsValid())
+	{
+		return FALSE;
+	}
 	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (!hEvent || hEvent == INVALID_HANDLE_VALUE) return FALSE;
+	if (!hEvent || hEvent == INVALID_HANDLE_VALUE)
+	{
+		return FALSE;
+	}
 	Q_IOCP_PARAM pParam(QPOP, data, hEvent);
 	if (!PostQueuedCompletionStatus(m_hCompletionPort, sizeof(Q_IOCP_PARAM), (ULONG_PTR)&pParam, NULL))
 	{
 		CloseHandle(hEvent);
 		return FALSE;
 	}
-	if (WaitForSingleObject(hEvent, INFINITE) == WAIT_OBJECT_0) data = pParam.data;
+	if (WaitForSingleObject(hEvent, 1000) == WAIT_OBJECT_0)
+	{
+		data = pParam.data;
+	}
 	CloseHandle(hEvent);
 	return TRUE;
 }
@@ -141,13 +179,23 @@ inline size_t CQueue<T>::Size()
 		CloseHandle(hEvent);
 		return -1;
 	}
-	if (WaitForSingleObject(hEvent, INFINITE) == WAIT_OBJECT_0)
+	if (WaitForSingleObject(hEvent, 1000) == WAIT_OBJECT_0)
 	{
 		CloseHandle(hEvent);
 		return pParam.nOpt;
 	}
 	CloseHandle(hEvent);
 	return -1;
+}
+
+template<typename CPacket>
+inline CQueue<CPacket>* CQueue<CPacket>::GetInstance()
+{
+	if (m_instance == NULL)
+	{
+		m_instance = new CQueue<CPacket>();
+	}
+	return m_instance;
 }
 
 template<class T>
@@ -163,7 +211,7 @@ inline BOOL CQueue<T>::Clear()
 		CloseHandle(hEvent);
 		return FALSE;
 	}
-	ret = WaitForSingleObject(hEvent, INFINITE) == WAIT_OBJECT_0;
+	ret = WaitForSingleObject(hEvent, 1000) == WAIT_OBJECT_0;
 	CloseHandle(hEvent);
 	return ret;
 }
@@ -226,33 +274,41 @@ inline void CQueue<T>::HandleOpt(Q_IOCP_PARAM* pParam)
 template<class T>
 inline void CQueue<T>::HandlePush(Q_IOCP_PARAM* pParam)
 {
+	m_lock.lock();
 	m_lstData.push_back(pParam->data);
 	delete pParam;
+	m_lock.unlock();
 }
 
 template<class T>
 inline void CQueue<T>::HandlePop(Q_IOCP_PARAM* pParam)
 {
+	m_lock.lock();
 	if (!m_lstData.empty())
 	{
 		pParam->data = m_lstData.front();
 		m_lstData.pop_front();
 	}
 	if (pParam->hEvent) SetEvent(pParam->hEvent);
+	m_lock.unlock();
 }
 
 template<class T>
 inline void CQueue<T>::HandleSize(Q_IOCP_PARAM* pParam)
 {
+	m_lock.lock();
 	pParam->nOpt = m_lstData.size();
 	if (pParam->hEvent) SetEvent(pParam->hEvent);
+	m_lock.unlock();
 }
 
 template<class T>
 inline void CQueue<T>::HandleClear(Q_IOCP_PARAM* pParam)
 {
+	m_lock.lock();
 	m_lstData.clear();
 	if (pParam->hEvent) SetEvent(pParam->hEvent);
+	m_lock.unlock();
 }
 
 template<class T>
