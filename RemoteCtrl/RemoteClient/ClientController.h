@@ -62,5 +62,6 @@ private:
 	char *m_localPath;
 	char *m_remotePath;
 	BOOL m_isWatchDlgClosed;
+	std::atomic<BOOL> m_aRunning;
 };
 

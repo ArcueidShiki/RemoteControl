@@ -39,6 +39,8 @@
 
 `default: C:\Program Files (x86)\Visual Leak Detector\lib\Win64`
 
+`Alt + Enter -> Configuration Properties -> Linker -> Debugging -> General Debug Info -> FULL`
+
 ### Permission:
 
 **Run as Administrator**:

@@ -86,7 +86,9 @@ int CCommand::MakeDirectoryInfo(std::list<CPacket>& lstPackets, CPacket& inPacke
         finfo.IsDirectory = fdata.attrib & _A_SUBDIR;
         memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
         lstPackets.emplace_back(std::move(CPacket(CMD_DIR, (BYTE*)&finfo, sizeof(finfo))));
+#if 0
         TRACE("Server Send filename id : [%d], name: [%s], HasNext: [%d]\r\n", ++id, fdata.name, finfo.HasNext);
+#endif
         ret = _findnext(hfind, &fdata);
     } while (ret == 0);
     // when tmpfiles or logfiles, are huge, so send one file every time read.
@@ -180,7 +182,9 @@ int CCommand::MouseEvent(std::list<CPacket>& lstPackets, CPacket& inPacket)
     DWORD operation = mouse.nButton;
     if (operation != MOUSE_MOVE) SetCursorPos(mouse.point.x, mouse.point.y);
     operation |= mouse.nAction;
+#if 0
     TRACE("Mouse operation: %08X, x: %d, y: %d\n", operation, mouse.point.x, mouse.point.y);
+#endif
     switch (operation)
     {
         case MOUSE_LEFT | MOUSE_CLICK:

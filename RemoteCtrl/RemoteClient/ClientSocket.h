@@ -75,4 +75,5 @@ private:
 	std::map<UINT, MSGFUNC> m_mapMsgHandlers;
 	void SendPacket(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	HANDLE m_hEeventInvoke;	// Message Loop Thread started up event.
+	std::atomic<BOOL> m_aRunning;
 };

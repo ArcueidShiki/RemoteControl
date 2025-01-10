@@ -1,5 +1,11 @@
 #pragma once
 
+#define __DEBUG_MODE 1
+
+#if __DEBUG_MODE
+#include <vld.h>
+#endif
+
 #include "targetver.h"
 #include <stdio.h>
 #include <tchar.h>
@@ -8,12 +14,6 @@
 
 #ifndef VC_EXTRALEAN
 #define VC_EXTRALEAN            // Exclude rarely-used stuff from Windows headers
-#endif
-
-#define __DEBUG_MODE 0
-
-#if __DEBUG_MODE
-#include <vld.h>
 #endif
 
 #include <afx.h>

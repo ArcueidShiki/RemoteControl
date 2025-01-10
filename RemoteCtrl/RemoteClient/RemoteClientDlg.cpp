@@ -216,7 +216,9 @@ void CRemoteClientDlg::LoadDirectory()
 	CPoint ptMouse;
 	GetCursorPos(&ptMouse); // global point to screen
 	m_tree.ScreenToClient(&ptMouse); // screen to client
+#if 0
 	TRACE("PT mouse: x[%d] y[%d]\n", ptMouse.x, ptMouse.y);
+#endif
 	m_hTreeSelected = m_tree.HitTest(ptMouse, 0);
 	if (m_hTreeSelected == NULL)
 	{
@@ -237,7 +239,9 @@ void CRemoteClientDlg::LoadDirectory()
 	CT2A asciiPath(strPath);
 	const char* path = asciiPath;
 	size_t strLen = strlen(asciiPath);
+#if 0
 	TRACE("strPath: %s Length: %zu\n", path, strLen);
+#endif
 	int nCmd = CClientController::GetInstance()->SendCommandPacket(GetSafeHwnd(), CMD_DIR, (BYTE*)path, strLen, FALSE);
 }
 
@@ -369,7 +373,9 @@ void CRemoteClientDlg::GetFile(CPacket &response)
 	PFILEINFO pInfo = (PFILEINFO)response.strData.c_str();
 	if (pInfo->HasNext)
 	{
+#if 0
 		TRACE("Client receive file, name: [%s] Has Next: [%d] \n", pInfo->szFileName, pInfo->HasNext);
+#endif
 		if (!pInfo->IsDirectory)
 		{
 			// FILE

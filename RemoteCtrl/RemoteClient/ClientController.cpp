@@ -25,6 +25,7 @@ CClientController::CClientController()
 	m_tid = UINT(-1);
 	m_hThread = INVALID_HANDLE_VALUE;
 	m_isWatchDlgClosed = TRUE;
+	m_aRunning.store(FALSE);
 }
 
 int CClientController::InitController()
@@ -59,6 +60,7 @@ void CClientController::ReleaseInstance()
 {
 	if (m_instance)
 	{
+		// clear static resources
 		m_mapFunc.clear();
 		delete m_instance;
 		m_instance = NULL;
@@ -67,7 +69,13 @@ void CClientController::ReleaseInstance()
 
 CClientController::~CClientController()
 {
-	WaitForSingleObject(m_hThread, 100);
+	m_aRunning.store(FALSE);
+	if (WaitForSingleObject(m_hThread, 500) != WAIT_OBJECT_0)
+	{
+		// wait for m_hThread been signaled failed. force terminate thread.
+		TerminateThread(m_hThread, 0);
+	}
+	m_hThread = INVALID_HANDLE_VALUE;
 	if (m_clientDlg)
 	{
 		delete m_clientDlg;
@@ -82,11 +90,6 @@ CClientController::~CClientController()
 	{
 		delete[] m_remotePath;
 		m_remotePath = NULL;
-	}
-	TerminateThread(m_hThread, 0);
-	if (m_hThreadWatch != INVALID_HANDLE_VALUE)
-	{
-		TerminateThread(m_hThreadWatch, 0);
 	}
 }
 
@@ -181,13 +184,20 @@ void CClientController::StartWatchScreen()
 	m_hThreadWatch = (HANDLE)_beginthread(&CClientController::ThreadWatchScreenEntry, 0, this);
 	m_watchDlg.DoModal();
 	m_isWatchDlgClosed = TRUE;
-	WaitForSingleObject(m_hThreadWatch, 500);
+	if (WaitForSingleObject(m_hThreadWatch, 500) != WAIT_OBJECT_0)
+	{
+		// wait for m_hThreadWatch been signaled failed. force terminate thread.
+		TerminateThread(m_hThreadWatch, 0);
+	}
+	m_hThreadWatch = INVALID_HANDLE_VALUE;
+	// Don't double close, close NULL, or INVALID_HANDLE_VALUE
 }
 
 void CClientController::MessageLoop()
 {
 	MSG msg; // Message Loop
-	while (::GetMessage(&msg, NULL, 0, 0))
+	m_aRunning.store(TRUE);
+	while (m_aRunning.load() && ::GetMessage(&msg, NULL, 0, 0))
 	{
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
@@ -243,6 +253,7 @@ void CClientController::ThreadWatchScreen()
 				Sleep((DWORD)(nTick + 200 - GetTickCount64()));
 			}
 			// watchDlg Hwnd receive WM_SEND_PACKET_ACK msg
+			// TODO: optimize this to udp and long connection
 			if (!SendCommandPacket(m_watchDlg.GetSafeHwnd(), CMD_SEND_SCREEN, NULL, 0, FALSE))
 			{
 				TRACE("Get Image Failed\n");
