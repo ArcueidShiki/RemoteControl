@@ -10,7 +10,7 @@
 #include "WatchDlg.h"
 #include "ClientController.h"
 
-#ifdef _DEBUG
+#ifdef DEBUG_MODE
 #define new DEBUG_NEW
 #endif
 #ifndef WM_SEND_PACKET_ACK

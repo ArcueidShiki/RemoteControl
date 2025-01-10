@@ -11,8 +11,9 @@
 #include <MSWSock.h>
 #include "Server.h"
 #include <ws2tcpip.h>
+#include "Network.h"
 
-#ifdef _DEBUG
+#ifdef DEBUG_MODE
 #define new DEBUG_NEW
 #endif
 
@@ -28,7 +29,7 @@ CWinApp theApp;
 
 using namespace std;
 
-#if 0
+#if __DEBUG_MODE
 // IOCP
 enum {
     IocpListEmpty,
@@ -141,92 +142,16 @@ void test()
     printf("Cleared, Size: %zu\n", lstString.Size());
 }
 
-#endif
-
-
-void iocp()
+void test_iocp()
 {
-    Server server;
-    server.StartService();
-	printf("Press any key to exit\n");
-    int ch = getchar();
-    printf("Exit\n");
-}
-
-void udp_server();
-void udp_client(BOOL isHost = TRUE);
-
-//int wmain(int argc, wchar_t *argv[])
-//int _tmain(int argc, TCHAR *argv[])
-
-// Set Property->Linker->1. Entry point: mainCRTStartup, 2. SubSystem: Windows.
-int main(int argc, char *argv[])
-{
-#if 0
-    if (!CUtils::IsAdmin())
-    {
-        return CUtils::RunAsAdmin() ? 0 : 1;
-    }
-#endif
-
-    if (!CUtils::Init())
-    {
-        return 1;
-    }
-
-    WSADATA wsa;
-    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
-    {
-        printf("WSAStartup failed with error: %d\n", GetLastError());
-        return -1;
-    }
-    if (argc == 1)
-    {   // udp server
-        char strDir[MAX_PATH];
-		GetCurrentDirectoryA(MAX_PATH, strDir);
-        STARTUPINFOA si = { 0 };
-        PROCESS_INFORMATION pi = {};
-        string strCmd = argv[0]; // program name
-        strCmd += " 1"; // argc = 2
-        BOOL ret = CreateProcessA(NULL, (LPSTR)strCmd.c_str(), NULL, NULL, FALSE, 0, NULL, strDir, &si, &pi);
-        if (ret)
-        {
-            CloseHandle(pi.hThread);
-            CloseHandle(pi.hProcess);
-            TRACE("Process pid:%d, tid:%d\n", pi.dwProcessId, pi.dwThreadId);
-            strCmd += " 2"; // argc = 3
-            ret = CreateProcessA(NULL, (LPSTR)strCmd.c_str(), NULL, NULL, FALSE, 0, NULL, strDir, &si, &pi);
-			if (ret)
-			{
-				CloseHandle(pi.hThread);
-				CloseHandle(pi.hProcess);
-				TRACE("Process pid:%d, tid:%d\n", pi.dwProcessId, pi.dwThreadId);
-                udp_server();
-			}
-        }
-    }
-    else if (argc == 2)
-    {
-        // client host
-        udp_client();
-    }
-    else
-    {   // client servant
-        udp_client(FALSE);
-    }
-    WSACleanup();
-
-    //iocp();
-
-#if 0
     HANDLE hIOCP = INVALID_HANDLE_VALUE;
     // HANDLE: socket, file, serial port
-	// epoll is single thread, IOCP allows multi-thread
+    // epoll is single thread, IOCP allows multi-thread
     hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);
     // put IOCP into a thread,
     HANDLE hThread = (HANDLE)_beginthread(ThreadQueueEntry, 0, hIOCP);
-	ULONGLONG tick = GetTickCount64();
-	ULONGLONG tick1 = GetTickCount64();
+    ULONGLONG tick = GetTickCount64();
+    ULONGLONG tick1 = GetTickCount64();
 
     if (hIOCP != NULL)
     {
@@ -235,7 +160,7 @@ int main(int argc, char *argv[])
         {
             if (GetTickCount64() - tick > 1300)
             {
-				// separate request and response
+                // separate request and response
                 PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPop, "Msg pop\r\n", &Func), NULL);
                 tick = GetTickCount64();
             }
@@ -250,46 +175,34 @@ int main(int argc, char *argv[])
         WaitForSingleObject(hThread, INFINITE);
         CloseHandle(hIOCP);
     }
-    printf("exit\n");
-#endif
-
-#if 0
-    if (!CUtils::ChooseBootStartUp())
-    {
-        return 1;
-    }
-    CCommand cmd;
-    switch (CServerSocket::GetInstance()->Run(&CCommand::RunCommand, &cmd))
-    {
-        case -1:
-            MessageBox(NULL, _T("Cannot Initiate socket, please check network setting!"), _T("Soccket Initialization Error!"), MB_OK | MB_ICONERROR);
-            break;
-		case -2:
-            MessageBox(NULL, _T("Cannot accept user, failed many time, program exit"), _T("Accept Client Failed!"), MB_OK | MB_ICONERROR);
-            break;
-    }
-#endif
-    return 0;
 }
 
-#include "Network.h"
+void iocp()
+{
+    Server server;
+    server.StartService();
+	printf("Press any key to exit\n");
+    int ch = getchar();
+    printf("Exit\n");
+}
+
 int RecvFromCB(void* arg, const Buffer& buf, SocketAddrIn& addr)
 {
     NServer* server = (NServer*)arg;
     return server->Sendto(buf, addr);
 }
 
-int SendToCB(void* arg, const SocketAddrIn &addr, int ret)
+int SendToCB(void* arg, const SocketAddrIn& addr, int ret)
 {
     NServer* server = (NServer*)arg;
-	printf("%s(%d):%s Sendto done! %p\n", __FILE__, __LINE__, __FUNCTION__, server);
+    printf("%s(%d):%s Sendto done! %p\n", __FILE__, __LINE__, __FUNCTION__, server);
     return 0;
 }
 
 void udp_server()
 {
     std::list<SocketAddrIn> lstClientAddrs;
-	NServerParam param("127.0.0.1", 30000, PTYPE::UDP, NULL, NULL, NULL, RecvFromCB, SendToCB);
+    NServerParam param("127.0.0.1", 30000, PTYPE::UDP, NULL, NULL, NULL, RecvFromCB, SendToCB);
     NServer server(param);
     server.Invoke(&server);
     printf("%s(%d):%s\n", __FILE__, __LINE__, __FUNCTION__);
@@ -304,8 +217,8 @@ void udp_client(BOOL isHost)
 
     SOCKADDR_IN servAddr = {};
     inet_pton(AF_INET, "127.0.0.1", &servAddr.sin_addr);
-	servAddr.sin_family = AF_INET;
-	servAddr.sin_port = htons(30000);
+    servAddr.sin_family = AF_INET;
+    servAddr.sin_port = htons(30000);
     SOCKET sock = socket(PF_INET, SOCK_DGRAM, 0);
     socklen_t serv_addr_size = sizeof(servAddr);
     int len = 0;
@@ -372,4 +285,92 @@ void udp_client(BOOL isHost)
 
     }
     closesocket(sock);
+}
+int test_udp_hole_puch(int argc, char* argv[])
+{
+    WSADATA wsa;
+    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+    {
+        printf("WSAStartup failed with error: %d\n", GetLastError());
+        return -1;
+    }
+    if (argc == 1)
+    {   // udp server
+        char strDir[MAX_PATH];
+        GetCurrentDirectoryA(MAX_PATH, strDir);
+        STARTUPINFOA si = { 0 };
+        PROCESS_INFORMATION pi = {};
+        string strCmd = argv[0]; // program name
+        strCmd += " 1"; // argc = 2
+        BOOL ret = CreateProcessA(NULL, (LPSTR)strCmd.c_str(), NULL, NULL, FALSE, 0, NULL, strDir, &si, &pi);
+        if (ret)
+        {
+            CloseHandle(pi.hThread);
+            CloseHandle(pi.hProcess);
+            TRACE("Process pid:%d, tid:%d\n", pi.dwProcessId, pi.dwThreadId);
+            strCmd += " 2"; // argc = 3
+            ret = CreateProcessA(NULL, (LPSTR)strCmd.c_str(), NULL, NULL, FALSE, 0, NULL, strDir, &si, &pi);
+            if (ret)
+            {
+                CloseHandle(pi.hThread);
+                CloseHandle(pi.hProcess);
+                TRACE("Process pid:%d, tid:%d\n", pi.dwProcessId, pi.dwThreadId);
+                udp_server();
+            }
+        }
+    }
+    else if (argc == 2)
+    {
+        // client host
+        udp_client();
+    }
+    else
+    {   // client servant
+        udp_client(FALSE);
+    }
+    WSACleanup();
+
+}
+
+#endif
+
+
+//int wmain(int argc, wchar_t *argv[])
+//int _tmain(int argc, TCHAR *argv[])
+
+// Set Property->Linker->1. Entry point: mainCRTStartup, 2. SubSystem: Windows.
+int main(int argc, char *argv[])
+{
+#if !__DEBUG_MODE
+
+    if (!CUtils::IsAdmin())
+    {
+        return CUtils::RunAsAdmin() ? 0 : 1;
+    }
+#endif
+
+    if (!CUtils::Init())
+    {
+        return 1;
+    }
+
+#if !__DEBUG_MODE
+    // prevUser run this program as admin
+	char* prevUser = argv[1];
+    if (!CUtils::ChooseBootStartUp(prevUser))
+    {
+        return 1;
+    }
+    CCommand cmd;
+    switch (CServerSocket::GetInstance()->Run(&CCommand::RunCommand, &cmd))
+    {
+        case -1:
+            MessageBox(NULL, _T("Cannot Initiate socket, please check network setting!"), _T("Soccket Initialization Error!"), MB_OK | MB_ICONERROR);
+            break;
+		case -2:
+            MessageBox(NULL, _T("Cannot accept user, failed many time, program exit"), _T("Accept Client Failed!"), MB_OK | MB_ICONERROR);
+            break;
+    }
+#endif
+    return 0;
 }

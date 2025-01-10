@@ -30,7 +30,7 @@ void CUtils::ShowError()
 
 BOOL CUtils::RunAsAdmin()
 {
-#if 0
+#if __DEBUG_MODE
     HANDLE hToken = NULL;
     // cmd->secpol.msc->Local Policies->Security Options->
     // Accounts: Administrator account status -> Enable
@@ -44,17 +44,28 @@ BOOL CUtils::RunAsAdmin()
         CloseHandle(hToken);
         ::exit(0);
     }
-    //MessageBox(NULL, _T("Logon Administrator Success"), NULL, MB_ICONINFORMATION | MB_TOPMOST);
 #endif
+    DWORD nSize = MAX_PATH;
+    char who[MAX_PATH] = "";
+    GetUserNameA(who, &nSize);
     STARTUPINFO si = { 0 };
     PROCESS_INFORMATION pi = { 0 };
-    TCHAR sPath[MAX_PATH] = _T("");
-    GetModuleFileName(NULL, sPath, MAX_PATH);
-    if (!CreateProcessWithLogonW(_T("Administrator"), NULL, NULL, LOGON_WITH_PROFILE, NULL, sPath, CREATE_UNICODE_ENVIRONMENT, NULL, NULL, &si, &pi))
+    char sCmdline[MAX_PATH] = "";
+    GetModuleFileNameA(NULL, sCmdline, MAX_PATH);
+	strcat_s(sCmdline, " ");
+    strcat_s(sCmdline, who);
+    TCHAR wsCmdline[MAX_PATH] = L"";
+	mbstowcs_s(NULL, wsCmdline, sCmdline, strlen(sCmdline));
+#if __DEBUG_MODE
+    TRACE("User Name: [%s]\n", who);
+    MessageBoxA(NULL, who, "RunAsAdmin", MB_ICONINFORMATION | MB_TOPMOST);
+    MessageBox(NULL, wsCmdline, L"New Process Cmdline", MB_ICONINFORMATION | MB_TOPMOST);
+#endif
+    if (!CreateProcessWithLogonW(_T("Administrator"), NULL, NULL, LOGON_WITH_PROFILE, NULL, wsCmdline, CREATE_UNICODE_ENVIRONMENT, NULL, NULL, &si, &pi))
     {
-        ShowError(); // A required privilege is not held by the client
+        // A required privilege is not held by the client
+        ShowError();
         MessageBox(NULL, _T("Create process failed"), NULL, MB_ICONERROR | MB_TOPMOST);
-        //CloseHandle(hToken);
         return FALSE;
     }
     WaitForSingleObject(pi.hProcess, INFINITE);
@@ -62,7 +73,6 @@ BOOL CUtils::RunAsAdmin()
     CloseHandle(pi.hThread);
     MessageBox(NULL, _T("Run as administrator success!"), _T("Permission Granted"), MB_ICONINFORMATION | MB_TOPMOST);
     return TRUE;
-    //CloseHandle(hToken);
 }
 
 BOOL CUtils::IsAdmin()
@@ -88,7 +98,9 @@ BOOL CUtils::IsAdmin()
     {
         return elevation.TokenIsElevated;
     }
+#if __DEBUG_MODE
     TRACE("Length of token information is %d\r\n", len);
+#endif
     return FALSE;
 }
 
@@ -100,7 +112,9 @@ BOOL CUtils::MakeLink()
     strcat_s(sSysPath, LINK_NAME);
     if (PathFileExistsA(sSysPath))
     {
-        MessageBox(NULL, L"RemoteControlServer.exe already exists in system directory", NULL, MB_ICONERROR | MB_TOPMOST);
+#if __DEBUG_MODE  
+        MessageBox(NULL, L"RemoteControlServer.exe already exists in system directory", L"", MB_ICONINFORMATION | MB_TOPMOST);
+#endif
         return TRUE;
     }
 
@@ -147,31 +161,33 @@ BOOL CUtils::WriteRegistryTable()
     return TRUE;
 }
 
-BOOL CUtils::WriteStartupDir()
+BOOL CUtils::WriteStartupDir(const char* who)
 {
-    DWORD nSize = MAX_PATH;
-    char sUser[MAX_PATH] = "";
-    GetUserNameA(sUser, &nSize);
-    TRACE("User Name: [%s]\n", sUser);
     // startup dir path
     char sStarupDir[MAX_PATH] = USER_PATH;
-    strcat_s(sStarupDir, sUser);
+    strcat_s(sStarupDir, "win10");
     // this path need run as administrator
     strcat_s(sStarupDir, STARTUP_DIR_PATH);
     if (PathFileExistsA(sStarupDir))
     {
-        TRACE("RemoteControlServer.exe already exists in startup directory, Override it\n");
+#if __DEBUG_MODE
+        MessageBox(NULL, _T("RemoteControlServer.exe already exists in startup directory, Override it\n"), _T(""), MB_ICONINFORMATION | MB_TOPMOST);
+#endif
     }
-    // get program startup cmdline
-    LPSTR sCmd = GetCommandLineA(); //it will contain extra "" which unncessary
-    //char sPath[MAX_PATH] = "";
-    //GetCurrentDirectoryA(MAX_PATH, sPath);
-    //strcat_s(sPath, "\\RemoteCtrl.exe"); TCHAR
-	//GetModuleNameA(NULL, sPath, MAX_PATH);
 
-    TRACE("Program name: [%s], dst name:[%s]\n", sCmd, sStarupDir);
+    // get program startup cmdline, only correct for no args 
+    //LPSTR sCmd = GetCommandLineA(); //it will contain extra "" which unncessary
+    char sPath[MAX_PATH] = "";
+    //GetCurrentDirectoryA(MAX_PATH, sPath);
+    //strcat_s(sPath, "\\RemoteCtrl.exe");
+    GetModuleFileNameA(NULL, sPath, MAX_PATH);
+#if __DEBUG_MODE
+    MessageBoxA(NULL, sStarupDir, "Dst", MB_ICONINFORMATION | MB_TOPMOST);
+    MessageBoxA(NULL, sPath, "Src", MB_ICONINFORMATION | MB_TOPMOST);
+    TRACE("Program name: [%s], dst name:[%s]\n", sPath, sStarupDir);
+#endif
     // other choices: fopen, CFile, system(copy), OpenFile, mklin, create short cut.
-    if (!CopyFileA(sCmd, sStarupDir, FALSE))
+    if (!CopyFileA(sPath, sStarupDir, FALSE))
     {
         MessageBox(NULL, _T("Copy file to startup menu failed. Don't have enough permission?\r\n Program start failed!"),
             _T("Startup Failed"), MB_ICONERROR | MB_TOPMOST);
@@ -191,7 +207,7 @@ BOOL CUtils::WriteStartupDir()
 * boot startup will affects env variables, dependent dll(system32(64bit program)) sysmWow64(32bit program)
 * using static library
 */
-BOOL CUtils::ChooseBootStartUp()
+BOOL CUtils::ChooseBootStartUp(const char *who)
 {
     CString warning = WARNING_MSG;
     int ret = MessageBox(NULL, warning, _T("Warnning"), MB_YESNOCANCEL | MB_ICONWARNING | MB_TOPMOST);
@@ -201,7 +217,7 @@ BOOL CUtils::ChooseBootStartUp()
         {
             return FALSE;
         }
-        if (!WriteStartupDir() && !WriteRegistryTable())
+        if (!WriteStartupDir(who) && !WriteRegistryTable())
         {
             return FALSE;
         }
@@ -221,10 +237,8 @@ BOOL CUtils::Init()
         wprintf(L"Fatal Error: GetModuleHandle failed\n");
         return FALSE;
     }
-    // initialize MFC and print and error on failure
     if (!AfxWinInit(hModule, nullptr, ::GetCommandLine(), 0))
     {
-        // TODO: code your application's behavior here.
         wprintf(L"Fatal Error: MFC initialization failed\n");
         return FALSE;
     }

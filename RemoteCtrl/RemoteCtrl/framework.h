@@ -9,7 +9,13 @@
 #ifndef VC_EXTRALEAN
 #define VC_EXTRALEAN            // Exclude rarely-used stuff from Windows headers
 #endif
+
+#define __DEBUG_MODE 0
+
+#if __DEBUG_MODE
 #include <vld.h>
+#endif
+
 #include <afx.h>
 #include <afxwin.h>         // MFC core and standard components
 #include <afxext.h>         // MFC extensions
