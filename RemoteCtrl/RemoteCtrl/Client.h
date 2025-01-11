@@ -18,10 +18,12 @@ using ERROR_OVERLAPPED = ErrorOverlapped<OP_ERROR>;
 class Client : public ThreadFuncBase
 {
 public:
-	Client(CMD_SPTR &cmd, CMD_CB callback = NULL);
+	Client(CMD_SPTR &cmd);
 	~Client();
 	int Recv();
 	int Send();
+	void CloseClient();
+	BOOL SendPacket(CPacket& packet);
 	void SetOverlapped(Client* ptr);
 	 SOCKET GetSocket() const;
 	 PVOID GetBuffer();
@@ -37,13 +39,15 @@ public:
 	LPOVERLAPPED GetSendOverLapped();
 	LPOVERLAPPED GetErrorOverLapped();
 	int ProcessCommand();
+	int ParseCommand();
 public:
 	std::shared_ptr<typename ACCEPT_OVERLAPPED> m_accept; 
 	std::shared_ptr<typename RECV_OVERLAPPED> m_recv;
 	std::shared_ptr<typename SEND_OVERLAPPED> m_send;
 	std::shared_ptr<typename ERROR_OVERLAPPED> m_error;
-private:
-	int ParseCommand();
+	std::atomic<BOOL> m_cmdParsed;
+	std::atomic<BOOL> m_sendFinish;
+	CPacket m_packet;
 private:
 	BOOL m_inUse;
 	DWORD m_received;
@@ -56,9 +60,7 @@ private:
 	SOCKADDR_IN* m_laddr;
 	SOCKADDR_IN* m_raddr;
 	std::atomic<BOOL> m_lock;
-	CQueue<CPacket> *m_queue;	// Too many send queue, should be only one singleton
-	// client don't own the cmd itself, because, it will copy self times
-	// obtain cmd obj from server, and it function pointer callback;
-	CPacket m_packet; // incoming packet
+	// one client instance, on send queue, because the data packets are separate from other clients
+	CQueue<CPacket> m_queue;
 	CMD_SPTR m_spCmd;
 };

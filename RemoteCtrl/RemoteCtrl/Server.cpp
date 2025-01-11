@@ -86,7 +86,7 @@ BOOL Server::NewAccept()
 		sizeof(SOCKADDR_IN) + 16,
 		sizeof(SOCKADDR_IN) + 16,
 		pClient->GetReceived(),
-		pClient->GetAcceptOverlapped())) // if success jump to accept worker
+		pClient->GetAcceptOverlapped())) // IOCP -> accept overlapped -> accept worker
 	{
 		int err = WSAGetLastError();
 		if (err != WSA_IO_PENDING)
@@ -128,19 +128,19 @@ INT Server::IOCPLoop()
 				}
 					break;
 				// one client socket in map has recv IO event occured
-				case Operator::OP_RECV:
-				{
-					RECV_OVERLAPPED* pOver = (RECV_OVERLAPPED*)pOverlapped;
-					m_pool.DispatchWorker(pOver->m_worker);
-				}
-					break;
+				//case Operator::OP_RECV:
+				//{
+				//	RECV_OVERLAPPED* pOver = (RECV_OVERLAPPED*)pOverlapped;
+				//	m_pool.DispatchWorker(pOver->m_worker);
+				//}
+				//	break;
 				// one client socket in map has send IO event occured
-				case Operator::OP_SEND:
-				{
-					SEND_OVERLAPPED* pOver = (SEND_OVERLAPPED*)pOverlapped;
-					m_pool.DispatchWorker(pOver->m_worker);
-				}
-					break;
+				//case Operator::OP_SEND:
+				//{
+				//	SEND_OVERLAPPED* pOver = (SEND_OVERLAPPED*)pOverlapped;
+				//	m_pool.DispatchWorker(pOver->m_worker);
+				//}
+				//	break;
 				case Operator::OP_ERROR:
 				{
 					ERROR_OVERLAPPED* pOver = (ERROR_OVERLAPPED*)pOverlapped;

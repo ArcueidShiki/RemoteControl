@@ -2,7 +2,7 @@
 #include "Queue.h"
 
 template<class T>
-class SendQueue : public CQueue<T>, public ThreadFuncBase
+class SendQueue : public CQueue<T>
 {
 public:
 	typedef int (ThreadFuncBase::* CB)(T& data /* = CPacket */);
@@ -10,9 +10,9 @@ public:
 	virtual ~SendQueue();
 protected:
 	// using timer to auto pop dispatch message instead of parent popfront
-	BOOL PopFront();
+	bool PopFront();
 	// prohibit this popfront function.
-	//virtual BOOL PopFront(T& data) { return FALSE; }
+	//virtual bool PopFront(T& data) { return FALSE; }
 	virtual void HandleOpt(typename CQueue<T>::Q_IOCP_PARAM* pParam);
 	virtual void HandlePop(typename CQueue<T>::Q_IOCP_PARAM* pParam);
 private:
@@ -44,7 +44,7 @@ inline SendQueue<T>::~SendQueue()
 }
 
 template<class T>
-inline BOOL SendQueue<T>::PopFront()
+inline bool SendQueue<T>::PopFront()
 {
 	if (CQueue<T>::m_aStop.load())
 	{
@@ -95,7 +95,7 @@ inline void SendQueue<T>::HandlePop(typename CQueue<T>::Q_IOCP_PARAM* pParam)
 //inline int SendQueue<T>::ThreadTick()
 //{
 //	// thread is is running
-//	BOOL workerThreadRunning = WaitForSingleObject(CQueue<T>::m_hThread, 0) == WAIT_TIMEOUT;
+//	bool workerThreadRunning = WaitForSingleObject(CQueue<T>::m_hThread, 0) == WAIT_TIMEOUT;
 //	if (!workerThreadRunning) return -1;
 //	while (TRUE)
 //	{

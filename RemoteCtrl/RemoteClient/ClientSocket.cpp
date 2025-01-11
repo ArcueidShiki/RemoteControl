@@ -271,6 +271,12 @@ void CClientSocket::SendPacket(UINT nMsg, WPARAM wParam, LPARAM lParam)
 		while (m_socket != INVALID_SOCKET)
 		{
 			int n_recv = recv(m_socket, pBuf + index, BUF_SIZE - index, 0);
+			if (n_recv == 0)
+			{
+				// connection closed by server
+				CloseSocket();
+				::SendMessage(hWnd, WM_SEND_PACKET_ACK, NULL, -1);
+			}
 			if (n_recv > 0 || index > 0)
 			{
 				index += n_recv;

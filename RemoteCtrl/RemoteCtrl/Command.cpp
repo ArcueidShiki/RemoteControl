@@ -460,6 +460,7 @@ int Command::MakeDriverInfo(CQueue<CPacket>& queue, CPacket& inPacket)
         }
     }
     queue.PushBack(CPacket(CMD_DRIVER, (BYTE*)result.c_str(), result.size()));
+    //queue.PushBack(CPacket(CMD_DRIVER, NULL, 0));
     return 0;
 }
 
@@ -473,6 +474,7 @@ int Command::MakeDirectoryInfo(CQueue<CPacket>& queue, CPacket& inPacket)
         memcpy(finfo.szFileName, strPath.c_str(), strPath.size());
         OutputDebugString(_T("No permission to access the directory\n"));
         queue.PushBack(CPacket(CMD_DIR, (BYTE*)&finfo, sizeof(finfo)));
+        //queue.PushBack(CPacket(CMD_DIR, NULL, 0));
         return -2;
     }
     _finddata_t fdata;
@@ -483,6 +485,7 @@ int Command::MakeDirectoryInfo(CQueue<CPacket>& queue, CPacket& inPacket)
         FILEINFO finfo(FALSE, TRUE, FALSE, strPath.c_str());
         OutputDebugString(_T("No files in the directory\n"));
         queue.PushBack(CPacket(CMD_DIR, (BYTE*)&finfo, sizeof(finfo)));
+        //queue.PushBack(CPacket(CMD_DIR, NULL, 0));
         return -3;
     }
     int ret;
@@ -502,6 +505,7 @@ int Command::MakeDirectoryInfo(CQueue<CPacket>& queue, CPacket& inPacket)
     // tell client, end.
     finfo.HasNext = FALSE;
     queue.PushBack(CPacket(CMD_DIR, (BYTE*)&finfo, sizeof(finfo)));
+    //queue.PushBack(CPacket(CMD_DIR, NULL, 0));
     _findclose(hfind);
     return 0;
 }
@@ -527,6 +531,7 @@ int Command::DownloadFile(CQueue<CPacket>& queue, CPacket& inPacket)
     if (err != 0)
     {
         queue.PushBack(CPacket(CMD_DLD_FILE, (BYTE*)&size, sizeof(size)));
+        //queue.PushBack(CPacket(CMD_DLD_FILE, NULL, 0));
         TRACE("Open File failed filename:[%s], name len: %zu\n", strPath.c_str(), strPath.size());
         return -1;
     }
@@ -546,6 +551,7 @@ int Command::DownloadFile(CQueue<CPacket>& queue, CPacket& inPacket)
         } while (rlen >= DLD_BUF_SIZE);
         fclose(pFile);
     }
+    //queue.PushBack(CPacket(CMD_DLD_FILE, NULL, 0));
     return 0;
 }
 
@@ -560,6 +566,7 @@ int Command::DelFile(CQueue<CPacket>& queue, CPacket& inPacket)
     if (err != 0)
     {
         TRACE("mbstowcs_s failed, error code: %d, nConverted: %zu\n", err, nConverted);
+        //queue.PushBack(CPacket(CMD_DEL_FILE, NULL, 0));
         return -1;
     }
     if (!DeleteFile((LPCWSTR)sPath))
@@ -644,6 +651,7 @@ int Command::SendScreen(CQueue<CPacket>& queue, CPacket& inPacket)
     PBYTE pData = (PBYTE)GlobalLock(hMem);
     SIZE_T nSize = GlobalSize(hMem);
     queue.PushBack(CPacket(CMD_SEND_SCREEN, pData, nSize));
+    //queue.PushBack(CPacket(CMD_SEND_SCREEN, NULL, 0));
     GlobalUnlock(hMem);
     pStream->Release();
     GlobalFree(hMem);

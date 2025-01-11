@@ -7,28 +7,31 @@
 #include "Packet.h"
 
 template<class T>
-class CQueue
+class CQueue : public ThreadFuncBase
 {
 public:
-	BOOL PushBack(const T& data);
-	virtual BOOL PopFront(T& data);
-	BOOL Clear();
+	typedef BOOL (ThreadFuncBase::* Callback)(T& data /* = CPacket */);
+	CQueue(ThreadFuncBase* obj = NULL /* = *client */, Callback callback = NULL/* = Client::SendPacket*/);
+	virtual ~CQueue();
+	bool PushBack(const T& data);
+	virtual bool PopFront(T& data);
+	bool Clear();
 	size_t Size();
-	static CQueue<T>* GetInstance();
+	bool AsyncSendAll();
 	enum {
 		QNONE,
 		QPUSH,
 		QPOP,
 		QSIZE,
 		QCLEAR,
+		QSEND,
 	};
 
-	// POST parameter for IOCP message
 	typedef struct IocpParam
 	{
 		size_t nOpt;
 		T data;
-		HANDLE hEvent; // for pop operation
+		HANDLE hEvent;
 		IocpParam(size_t nOpt, const T& data, HANDLE event = NULL)
 			: nOpt(nOpt)
 			, data(data)
@@ -46,48 +49,20 @@ protected:
 	virtual void HandlePop(Q_IOCP_PARAM* pParam);
 	virtual void HandleSize(Q_IOCP_PARAM* pParam);
 	virtual void HandleClear(Q_IOCP_PARAM* pParam);
-	BOOL IsValid();
+	virtual void HandleSend(Q_IOCP_PARAM* pParam);
+	bool IsValid();
 	std::list<T> m_lstData;
 	HANDLE m_hCompletionPort;
 	HANDLE m_hThread;
-	std::atomic<BOOL> m_aStop;
-
+	std::atomic<bool> m_aStop;
+	ThreadFuncBase* m_instance;
+	Callback m_callback;
 private:
 	static void ThreadEntry(void* instance);
 	void ThreadQueue();
-	CQueue();
-	virtual ~CQueue();
-	class CHelper {
-	public:
-		CHelper()
-		{
-			GetInstance();
-		}
-		~CHelper()
-		{
-			ReleaseInstance();
-		}
-	};
 private:
-	static CHelper m_helper;
-	static CQueue<T>* m_instance;
-	static void ReleaseInstance();
 	std::mutex m_lock;
 };
-
-// T no explicit instantiation
-// can only put implementation in header file
-template<class T>
-inline CQueue<T>::CQueue()
-{
-	m_aStop.store(FALSE);
-	m_hThread = INVALID_HANDLE_VALUE;
-	m_hCompletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);
-	if (m_hCompletionPort && m_hCompletionPort != INVALID_HANDLE_VALUE)
-	{
-		m_hThread = (HANDLE)_beginthread(&CQueue<T>::ThreadEntry, 0, this);
-	}
-}
 
 template<class T>
 inline CQueue<T>::~CQueue()
@@ -97,11 +72,6 @@ inline CQueue<T>::~CQueue()
 	m_aStop.exchange(TRUE);
 	// notify ThreadQueue to exit
 	PostQueuedCompletionStatus(m_hCompletionPort, 0, NULL, NULL);
-	// wait for thread exit
-	//if (WaitForSingleObject(m_hThread, 500) != WAIT_OBJECT_0)
-	//{
-	//	TerminateThread(m_hThread, 0);
-	//}
 	TerminateThread(m_hThread, 0);
 	m_hThread = INVALID_HANDLE_VALUE;
 	if (m_hCompletionPort && m_hCompletionPort != INVALID_HANDLE_VALUE)
@@ -113,20 +83,28 @@ inline CQueue<T>::~CQueue()
 	m_lstData.clear();
 }
 
-template<typename CPacket>
-inline void CQueue<CPacket>::ReleaseInstance()
+template<class T>
+inline CQueue<T>::CQueue(ThreadFuncBase* obj, Callback callback)
 {
-	if (m_instance != NULL)
+	m_instance = obj;
+	m_callback = callback;
+	m_aStop.store(FALSE);
+	m_hThread = INVALID_HANDLE_VALUE;
+	m_hCompletionPort = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);
+	if (m_hCompletionPort && m_hCompletionPort != INVALID_HANDLE_VALUE)
 	{
-		delete m_instance;
-		m_instance = NULL;
+		m_hThread = (HANDLE)_beginthread(&CQueue<T>::ThreadEntry, 0, this);
 	}
 }
 
 template<class T>
-inline BOOL CQueue<T>::PushBack(const T& data)
+inline bool CQueue<T>::PushBack(const T& data)
 {
-	if (!IsValid()) return FALSE;
+	if (!IsValid())
+	{
+		return FALSE;
+	}
+
 	Q_IOCP_PARAM* pParam = new Q_IOCP_PARAM(QPUSH, data);
 	if (!PostQueuedCompletionStatus(m_hCompletionPort, sizeof(Q_IOCP_PARAM), (ULONG_PTR)pParam, NULL))
 	{
@@ -137,27 +115,31 @@ inline BOOL CQueue<T>::PushBack(const T& data)
 }
 
 template<class T>
-inline BOOL CQueue<T>::PopFront(T& data)
+inline bool CQueue<T>::PopFront(T& data)
 {
 	if (!IsValid())
 	{
 		return FALSE;
 	}
+
 	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 	if (!hEvent || hEvent == INVALID_HANDLE_VALUE)
 	{
 		return FALSE;
 	}
-	Q_IOCP_PARAM pParam(QPOP, data, hEvent);
+
+	Q_IOCP_PARAM pParam(QPOP, T(), hEvent);
 	if (!PostQueuedCompletionStatus(m_hCompletionPort, sizeof(Q_IOCP_PARAM), (ULONG_PTR)&pParam, NULL))
 	{
 		CloseHandle(hEvent);
 		return FALSE;
 	}
+
 	if (WaitForSingleObject(hEvent, 1000) == WAIT_OBJECT_0)
 	{
 		data = pParam.data;
 	}
+
 	CloseHandle(hEvent);
 	return TRUE;
 }
@@ -165,52 +147,83 @@ inline BOOL CQueue<T>::PopFront(T& data)
 template<class T>
 inline size_t CQueue<T>::Size()
 {
-	if (!IsValid()) return FALSE;
-	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (!hEvent || hEvent == INVALID_HANDLE_VALUE) return -1;
-	if (!m_hCompletionPort)
+	if (!IsValid())
 	{
-		CloseHandle(hEvent);
 		return -1;
 	}
+
+	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if (!hEvent || hEvent == INVALID_HANDLE_VALUE)
+	{
+		return -1;
+	}
+
 	Q_IOCP_PARAM pParam(QSIZE, T(), hEvent);
 	if (!PostQueuedCompletionStatus(m_hCompletionPort, sizeof(Q_IOCP_PARAM), (ULONG_PTR)&pParam, NULL))
 	{
 		CloseHandle(hEvent);
 		return -1;
 	}
+
 	if (WaitForSingleObject(hEvent, 1000) == WAIT_OBJECT_0)
 	{
 		CloseHandle(hEvent);
 		return pParam.nOpt;
 	}
+
 	CloseHandle(hEvent);
 	return -1;
 }
 
-template<typename CPacket>
-inline CQueue<CPacket>* CQueue<CPacket>::GetInstance()
+template<class T>
+inline bool CQueue<T>::AsyncSendAll()
 {
-	if (m_instance == NULL)
+	if (!IsValid())
 	{
-		m_instance = new CQueue<CPacket>();
+		return FALSE;
 	}
-	return m_instance;
+
+	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if (!hEvent || hEvent == INVALID_HANDLE_VALUE)
+	{
+		return FALSE;
+	}
+
+	Q_IOCP_PARAM pParam(QSEND, T(), hEvent);
+	if (!PostQueuedCompletionStatus(m_hCompletionPort, sizeof(Q_IOCP_PARAM), (ULONG_PTR)&pParam, NULL))
+	{
+		CloseHandle(hEvent);
+		return FALSE;
+	}
+
+	WaitForSingleObject(hEvent, INFINITE);
+
+	CloseHandle(hEvent);
+	return TRUE;
 }
 
 template<class T>
-inline BOOL CQueue<T>::Clear()
+inline bool CQueue<T>::Clear()
 {
-	if (!IsValid()) return FALSE;
+	if (!IsValid())
+	{
+		return FALSE;
+	}
+
 	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (!hEvent || hEvent == INVALID_HANDLE_VALUE) return FALSE;
+	if (!hEvent || hEvent == INVALID_HANDLE_VALUE)
+	{
+		return FALSE;
+	}
+
 	Q_IOCP_PARAM pParam(QCLEAR, T(), hEvent);
-	BOOL ret = PostQueuedCompletionStatus(m_hCompletionPort, sizeof(Q_IOCP_PARAM), (ULONG_PTR)&pParam, NULL);
+	bool ret = PostQueuedCompletionStatus(m_hCompletionPort, sizeof(Q_IOCP_PARAM), (ULONG_PTR)&pParam, NULL);
 	if (!ret)
 	{
 		CloseHandle(hEvent);
 		return FALSE;
 	}
+
 	ret = WaitForSingleObject(hEvent, 1000) == WAIT_OBJECT_0;
 	CloseHandle(hEvent);
 	return ret;
@@ -267,6 +280,7 @@ inline void CQueue<T>::HandleOpt(Q_IOCP_PARAM* pParam)
 		case QPOP: return HandlePop(pParam);
 		case QSIZE: return HandleSize(pParam);
 		case QCLEAR: return HandleClear(pParam);
+		case QSEND: return HandleSend(pParam);
 		default: OutputDebugStringA("Unknown operation\n"); break;
 	}
 }
@@ -312,7 +326,22 @@ inline void CQueue<T>::HandleClear(Q_IOCP_PARAM* pParam)
 }
 
 template<class T>
-inline BOOL CQueue<T>::IsValid()
+inline void CQueue<T>::HandleSend(Q_IOCP_PARAM* pParam)
+{
+	m_lock.lock();
+	while (!m_lstData.empty())
+	{
+		if ((m_instance->*m_callback)(m_lstData.front()))
+		{
+			m_lstData.pop_front();
+		}
+	}
+	if (pParam->hEvent) SetEvent(pParam->hEvent);
+	m_lock.unlock();
+}
+
+template<class T>
+inline bool CQueue<T>::IsValid()
 {
 	if (m_aStop.load()) return FALSE;
 	if (!m_hCompletionPort || m_hCompletionPort == INVALID_HANDLE_VALUE) return FALSE;
