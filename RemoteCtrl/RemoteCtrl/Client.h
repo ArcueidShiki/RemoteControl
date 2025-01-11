@@ -1,7 +1,7 @@
 #pragma once
 #include "Thread.h"
 #include "Overlapped.h"
-#include "SendQueue.h"
+#include "Queue.h"
 #include "Operator.h"
 #include "Command.h"
 
@@ -18,32 +18,39 @@ using ERROR_OVERLAPPED = ErrorOverlapped<OP_ERROR>;
 class Client : public ThreadFuncBase
 {
 public:
-	Client();
+	Client(CMD_SPTR &cmd);
 	~Client();
 	int Recv();
-	int Send(void* buf, size_t size);
+	int ParseCommand();
+	int Send();
+	void CloseClient();
+	BOOL SendPacket(CPacket& packet);
 	void SetOverlapped(Client* ptr);
-	int SendData(std::vector<char>& data);
 	SOCKET GetSocket() const;
 	PVOID GetBuffer();
 	LPDWORD GetReceived();
 	SOCKADDR_IN** GetLocalAddr();
 	SOCKADDR_IN** GetRemoteAddr();
 	size_t GetBufSize();
-	DWORD& GetFlags();
+	LPDWORD GetFlags();
 	LPWSABUF GetRecvWSABuf();
 	LPWSABUF GetSendWSABuf();
 	LPOVERLAPPED GetAcceptOverlapped();
 	LPOVERLAPPED GetRecvOverLapped();
 	LPOVERLAPPED GetSendOverLapped();
 	LPOVERLAPPED GetErrorOverLapped();
+public:
 	std::shared_ptr<typename ACCEPT_OVERLAPPED> m_accept; 
 	std::shared_ptr<typename RECV_OVERLAPPED> m_recv;
 	std::shared_ptr<typename SEND_OVERLAPPED> m_send;
 	std::shared_ptr<typename ERROR_OVERLAPPED> m_error;
+	std::atomic<BOOL> m_cmdParsed;
+	std::atomic<BOOL> m_sendFinish;
+	CPacket m_packet;
 private:
 	BOOL m_inUse;
 	DWORD m_received;
+	DWORD m_sent;
 	DWORD m_flags;
 	size_t m_used;
 	std::vector<char> m_buffer;
@@ -52,6 +59,6 @@ private:
 	SOCKADDR_IN* m_laddr;
 	SOCKADDR_IN* m_raddr;
 	std::atomic<BOOL> m_lock;
-	SendQueue<std::vector<char>> m_qSend; // Send queue buf.
-	// TODO add Command::RunCommand;
+	CQueue<CPacket> m_queue;
+	CMD_SPTR m_spCmd;
 };

@@ -86,50 +86,13 @@ inline AcceptOverlapped<op>::AcceptOverlapped()
 	m_worker = ThreadWorker(this, (FUNC)&AcceptOverlapped<op>::AcceptWorker);
 }
 
-template<Operator op>
-inline int AcceptOverlapped<op>::AcceptWorker()
-{
-	if (!m_client) return -1;
-	if (!m_server) return -1;
-	INT lLength = 0, rLength = 0;
-	if (m_client->GetBufSize())
-	{
-		GetAcceptExSockaddrs(
-			m_client->GetBuffer(), 0,
-			sizeof(SOCKADDR_IN) + 16,
-			sizeof(SOCKADDR_IN) + 16,
-			(SOCKADDR**)m_client->GetLocalAddr(), &lLength,
-			(SOCKADDR**)m_client->GetRemoteAddr(), &rLength);
-		// add accepted client socket to IOCP handle
-		m_server->BindNewSocket(m_client->GetSocket());
-		int ret = WSARecv(
-			m_client->GetSocket(),
-			m_client->GetRecvWSABuf(),
-			1, m_client->GetReceived(),
-			&m_client->GetFlags(),
-			m_client->GetRecvOverLapped(), NULL);
-		if (ret == SOCKET_ERROR && WSAGetLastError() != WSA_IO_PENDING)
-		{
-			// 997 WSA_IO_PENDING is not considered as an error in nonblock mode.
-			TRACE("WSARecv failed with error: %d\n", WSAGetLastError());
-			CUtils::ShowError();
-			return -1;
-		}
-		if (!m_server->NewAccept())
-		{
-			return -1;
-		}
-	}
-	// ret < 0 end worker.
-	return -1;
-}
 
 template<Operator op>
 inline RecvOverlapped<op>::RecvOverlapped()
 {
 	m_overlapped = { 0 };
 	m_operator = op;
-	m_buffer.resize(1024 * 256, 0);
+	m_buffer.resize(4096000, 0);
 	m_server = NULL;
 	m_client = NULL;
 	m_wsabuf = { (ULONG)m_buffer.size(), m_buffer.data() };
@@ -137,21 +100,11 @@ inline RecvOverlapped<op>::RecvOverlapped()
 }
 
 template<Operator op>
-inline int RecvOverlapped<op>::RecvWorker()
-{
-	if (!m_client)
-	{
-		return -1;
-	}
-	return m_client->Recv();
-}
-
-template<Operator op>
 inline SendOverlapped<op>::SendOverlapped()
 {
 	m_overlapped = { 0 };
 	m_operator = op;
-	m_buffer.resize(1024 * 256, 0);
+	m_buffer.resize(4096000, 0);
 	m_server = NULL;
 	m_client = NULL;
 	m_wsabuf = { (ULONG)m_buffer.size(), m_buffer.data() };
@@ -159,24 +112,9 @@ inline SendOverlapped<op>::SendOverlapped()
 }
 
 template<Operator op>
-inline int SendOverlapped<op>::SendWorker()
-{
-	if (!m_client)
-	{
-		return -1;
-	}
-	// TODO
-	// Send Action won't complete immediately
-	return 0;
-}
-
-template<Operator op>
 inline ErrorOverlapped<op>::ErrorOverlapped()
 {
-	if (!m_client)
-	{
-		return;
-	}
+	if (!m_client) return;
 	m_overlapped = { 0 };
 	m_operator = op;
 	m_buffer.resize(1024, 0);
@@ -187,7 +125,56 @@ inline ErrorOverlapped<op>::ErrorOverlapped()
 }
 
 template<Operator op>
+inline int AcceptOverlapped<op>::AcceptWorker()
+{
+	if (!m_client) return -1;
+	if (!m_server) return -1;
+	INT lLength = 0, rLength = 0;
+	LPVOID buf[4096];
+	GetAcceptExSockaddrs(
+		buf, 0,
+		sizeof(SOCKADDR_IN) + 16,
+		sizeof(SOCKADDR_IN) + 16,
+		(SOCKADDR**)m_client->GetLocalAddr(), &lLength,
+		(SOCKADDR**)m_client->GetRemoteAddr(), &rLength);
+	// 1. accept bind client socket to IOCP handle
+	m_server->BindNewSocket(m_client->GetSocket());
+	// 2. recv IOCP -> recv overlapped -> recv worker
+	m_client->ParseCommand();
+	// non block, accept new client
+	m_server->NewAccept();
+	// end accept worker
+	return -1;
+}
+
+template<Operator op>
+inline int RecvOverlapped<op>::RecvWorker()
+{
+	if (!m_client) return -1;
+	while (!m_client->m_cmdParsed)
+	{
+		Sleep(1);
+	}
+	m_client->Send();
+	m_server->NewAccept();
+	return -1;
+}
+
+template<Operator op>
+inline int SendOverlapped<op>::SendWorker()
+{
+	if (!m_client) return -1;
+	while (!m_client->m_sendFinish)
+	{
+		Sleep(1);
+	}
+	m_client->CloseClient();
+	return -1;
+}
+
+template<Operator op>
 inline int ErrorOverlapped<op>::ErrorWorker()
 {
+	//m_server->NewAccept();
 	return 0;
 }

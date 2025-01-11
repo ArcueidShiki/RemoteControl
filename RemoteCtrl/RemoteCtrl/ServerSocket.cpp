@@ -198,34 +198,33 @@ int CServerSocket::Run(SOCKET_CALLBACK callback, void* arg, USHORT port)
 	std::list<CPacket> lstPackets;
 	while (TRUE)
 	{
-		if (_kbhit() != 0)
-		{
-			break;
-		}
-		printf("Server Running\n");
+		// 1. accpet
 		if (!AcceptClient())
 		{
 			if (count > 3) return -2;
 			count++;
 			MessageBox(NULL, _T("Cannot accept user, auto retry"), _T("Accept Client Failed!"), MB_OK | MB_ICONERROR);
 		}
+		// 2. recv and get cmd
 		int cmd = DealCommand();
 		if (cmd > 0)
 		{
+			// 3. fill packets
 			m_callback(m_arg, cmd, lstPackets, m_packet);
-			if (lstPackets.size() == 0)
+			if (lstPackets.empty())
 			{
 				TRACE("Error Server send packet size  = 0\n");
 			}
-			while (lstPackets.size() > 0)
+			while (!lstPackets.empty())
 			{
+				// 4. send
 				Send(lstPackets.front());
 				lstPackets.pop_front();
 			}
 		}
+		// close connection
 		CloseClient();
 	}
-	printf("Server Exit\n");
 	return 0;
 }
 

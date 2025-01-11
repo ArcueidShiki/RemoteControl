@@ -9,6 +9,7 @@
 #include "Utils.h"
 #include "LockDialog.h"
 #include "Resource.h"
+#include "Queue.h"
 
 #define PACKET_HEAD 0xFEFF
 #define CMD_DRIVER 1
@@ -47,3 +48,46 @@ protected:
 	unsigned tid;
 };
 
+class Command
+{
+public:
+	Command();
+	~Command();
+	int ExecuteCommand(int nCmd, CQueue<CPacket>& queue, CPacket& inPacket);
+	static void RunCommand(void* obj, int nCmd, CQueue<CPacket>& queue, CPacket& inPacket);
+protected:
+	int MakeDriverInfo(CQueue<CPacket>& queue, CPacket& inPacket);
+	int MakeDirectoryInfo(CQueue<CPacket>& queue, CPacket& inPacket);
+	int RunFile(CQueue<CPacket>& queue, CPacket& inPacket);
+	int DownloadFile(CQueue<CPacket>& queue, CPacket& inPacket);
+	int DelFile(CQueue<CPacket>& queue, CPacket& inPacket);
+	int MouseEvent(CQueue<CPacket>& queue, CPacket& inPacket);
+	int SendScreen(CQueue<CPacket>& queue, CPacket& inPacket);
+	int LockMachine(CQueue<CPacket>& queue, CPacket& inPacket);
+	int UnlockMachine(CQueue<CPacket>& queue, CPacket& inPacket);
+	void ThreadLockDlgMain();
+	static unsigned __stdcall ThreadLockDlg(void* obj);
+	typedef int (Command::* CMD_CALLBACK)(CQueue<CPacket>& queue, CPacket& inPacket); // member function pointer
+	std::map<int, CMD_CALLBACK> m_mapCmd;
+	CLockDialog dlg;
+	unsigned tid;
+private:
+	void MouseLClick();
+	void MouseLDBClick();
+	void MouseLDown();
+	void MouseLUp();
+	void MouseRClick();
+	void MouseRDBClick();
+	void MouseRDown();
+	void MouseRUp();
+	void MouseMClick();
+	void MouseMDBClick();
+	void MouseMDown();
+	void MouseMUp();
+	void MouseWheelUp();
+	void MouseWheelDown();
+	void MouseMove(MOUSEEV &mouse);
+};
+
+using CMD_CB = void(*)(void*, int, CQueue<CPacket>& queue, CPacket& inPacket);
+using CMD_SPTR = std::shared_ptr<Command>;

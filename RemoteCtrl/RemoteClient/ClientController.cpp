@@ -26,6 +26,7 @@ CClientController::CClientController()
 	m_hThread = INVALID_HANDLE_VALUE;
 	m_isWatchDlgClosed = TRUE;
 	m_aRunning.store(FALSE);
+	m_hThreadWatch = INVALID_HANDLE_VALUE;
 }
 
 int CClientController::InitController()
@@ -33,7 +34,7 @@ int CClientController::InitController()
 	// Create Handle Message Loop Thread with m_tid!
 	m_hThread = (HANDLE)_beginthreadex(NULL, 0, &CClientController::ThreadEntryMessageLoop, this, 0, &m_tid);
 	m_statusDlg.Create(IDD_DLG_STATUS, m_clientDlg);
-	struct {
+	struct msgfunc {
 		UINT nMsg;
 		MSGFUNC func;
 	} MsgFuncs[] = {
@@ -42,7 +43,7 @@ int CClientController::InitController()
 		{WM_SEND_MESSAGE, NULL/*TODO*/},
 		{UINT(-1), NULL}
 	};
-	for (int i = 0; MsgFuncs[i].nMsg != -1; i++)
+	for (int i = 0; i < sizeof(MsgFuncs) / sizeof(struct msgfunc); i++)
 	{
 		m_mapFunc.insert(std::pair<UINT, MSGFUNC>(MsgFuncs[i].nMsg, MsgFuncs[i].func));
 	}
@@ -70,11 +71,12 @@ void CClientController::ReleaseInstance()
 CClientController::~CClientController()
 {
 	m_aRunning.store(FALSE);
-	if (WaitForSingleObject(m_hThread, 500) != WAIT_OBJECT_0)
-	{
-		// wait for m_hThread been signaled failed. force terminate thread.
-		TerminateThread(m_hThread, 0);
-	}
+	TerminateThread(m_hThread, 0);
+	//if (WaitForSingleObject(m_hThread, 500) != WAIT_OBJECT_0)
+	//{
+	//	// wait for m_hThread been signaled failed. force terminate thread.
+	//	TerminateThread(m_hThread, 0);
+	//}
 	m_hThread = INVALID_HANDLE_VALUE;
 	if (m_clientDlg)
 	{
@@ -184,11 +186,12 @@ void CClientController::StartWatchScreen()
 	m_hThreadWatch = (HANDLE)_beginthread(&CClientController::ThreadWatchScreenEntry, 0, this);
 	m_watchDlg.DoModal();
 	m_isWatchDlgClosed = TRUE;
-	if (WaitForSingleObject(m_hThreadWatch, 500) != WAIT_OBJECT_0)
-	{
-		// wait for m_hThreadWatch been signaled failed. force terminate thread.
-		TerminateThread(m_hThreadWatch, 0);
-	}
+	TerminateThread(m_hThreadWatch, 0);
+	//if (WaitForSingleObject(m_hThreadWatch, 500) != WAIT_OBJECT_0)
+	//{
+	//	// wait for m_hThreadWatch been signaled failed. force terminate thread.
+	//	TerminateThread(m_hThreadWatch, 0);
+	//}
 	m_hThreadWatch = INVALID_HANDLE_VALUE;
 	// Don't double close, close NULL, or INVALID_HANDLE_VALUE
 }

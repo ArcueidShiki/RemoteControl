@@ -41,11 +41,13 @@ BOOL CThread::Start()
 BOOL CThread::Stop()
 {
 	m_aRunning.store(FALSE);
-	// wait failed
+	TerminateThread(m_hThread, 0);
+#if 0
 	if (WaitForSingleObject(m_hThread, 500) != WAIT_OBJECT_0)
 	{
 		TerminateThread(m_hThread, 0);
 	}
+#endif
 	m_hThread = INVALID_HANDLE_VALUE;
 	return TRUE;
 }
