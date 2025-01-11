@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "Client.h"
 #include "Utils.h"
+#include "Packet.h"
 
 constexpr int BUF_SIZE = 4096;
 using SEND_CALLBACK = CQueue<CPacket>::Callback;
