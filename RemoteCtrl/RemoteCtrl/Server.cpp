@@ -128,19 +128,19 @@ INT Server::IOCPLoop()
 				}
 					break;
 				// one client socket in map has recv IO event occured
-				//case Operator::OP_RECV:
-				//{
-				//	RECV_OVERLAPPED* pOver = (RECV_OVERLAPPED*)pOverlapped;
-				//	m_pool.DispatchWorker(pOver->m_worker);
-				//}
-				//	break;
+				case Operator::OP_RECV:
+				{
+					RECV_OVERLAPPED* pOver = (RECV_OVERLAPPED*)pOverlapped;
+					m_pool.DispatchWorker(pOver->m_worker);
+				}
+					break;
 				// one client socket in map has send IO event occured
-				//case Operator::OP_SEND:
-				//{
-				//	SEND_OVERLAPPED* pOver = (SEND_OVERLAPPED*)pOverlapped;
-				//	m_pool.DispatchWorker(pOver->m_worker);
-				//}
-				//	break;
+				case Operator::OP_SEND:
+				{
+					SEND_OVERLAPPED* pOver = (SEND_OVERLAPPED*)pOverlapped;
+					m_pool.DispatchWorker(pOver->m_worker);
+				}
+					break;
 				case Operator::OP_ERROR:
 				{
 					ERROR_OVERLAPPED* pOver = (ERROR_OVERLAPPED*)pOverlapped;
@@ -154,8 +154,8 @@ INT Server::IOCPLoop()
 		}
 	}
 	// If GetQueuedCompletionStatus returns FALSE, handle the error
-	if (!GetQueuedCompletionStatus(m_hIOCP, &dwTransferred, &CompletionKey, &lpOverlapped, INFINITE))
-	{
+	//if (!GetQueuedCompletionStatus(m_hIOCP, &dwTransferred, &CompletionKey, &lpOverlapped, INFINITE))
+	//{
 		DWORD error = GetLastError();
 		TRACE("GetQueuedCompletionStatus failed with error: %d\n", error);
 		// Handle specific errors if needed
@@ -174,6 +174,6 @@ INT Server::IOCPLoop()
 			TRACE("An unknown error occurred.\n");
 			break;
 		}
-	}
+	//}
 	return 0;
 }

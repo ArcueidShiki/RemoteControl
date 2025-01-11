@@ -140,9 +140,8 @@ inline int AcceptOverlapped<op>::AcceptWorker()
 	// 1. accept bind client socket to IOCP handle
 	m_server->BindNewSocket(m_client->GetSocket());
 	// 2. recv IOCP -> recv overlapped -> recv worker
-	m_client->Recv();
+	m_client->ParseCommand();
 	// non block, accept new client
-	m_client->CloseClient();
 	m_server->NewAccept();
 	// end accept worker
 	return -1;
@@ -151,23 +150,25 @@ inline int AcceptOverlapped<op>::AcceptWorker()
 template<Operator op>
 inline int RecvOverlapped<op>::RecvWorker()
 {
-	//if (!m_client) return -1;
-	//if (m_client->m_cmdParsed)
-	//{
-	//	m_client->Send();
-	//}
-	//m_server->NewAccept();
+	if (!m_client) return -1;
+	while (!m_client->m_cmdParsed)
+	{
+		Sleep(1);
+	}
+	m_client->Send();
+	m_server->NewAccept();
 	return -1;
 }
 
 template<Operator op>
 inline int SendOverlapped<op>::SendWorker()
 {
-	//if (!m_client) return -1;
-	//if (m_client->m_sendFinish)
-	//{
-	//	m_server->NewAccept();
-	//}
+	if (!m_client) return -1;
+	while (!m_client->m_sendFinish)
+	{
+		Sleep(1);
+	}
+	m_client->CloseClient();
 	return -1;
 }
 

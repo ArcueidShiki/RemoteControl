@@ -17,7 +17,7 @@
 #define new DEBUG_NEW
 #endif
 
-#if 0
+#ifdef TEST
 #pragma comment(linker, "/subsystem:windwos /entry:WinMainCRTStartup")
 #pragma comment(linker, "/subsystem:windwos /entry:mainCRTStartup")
 #pragma comment(linker, "/subsystem:console /entry:WinMainCRTStartup")
@@ -29,7 +29,7 @@ CWinApp theApp;
 
 using namespace std;
 
-#if 0
+#if TEST
 // IOCP
 enum {
     IocpListEmpty,
@@ -329,20 +329,15 @@ int test_udp_hole_puch(int argc, char* argv[])
         udp_client(FALSE);
     }
     WSACleanup();
-
 }
-
 #endif
-
 
 //int wmain(int argc, wchar_t *argv[])
 //int _tmain(int argc, TCHAR *argv[])
-
 // Set Property->Linker->1. Entry point: mainCRTStartup, 2. SubSystem: Windows.
 int main(int argc, char *argv[])
 {
 #if !__DEBUG_MODE
-
     if (!CUtils::IsAdmin())
     {
         return CUtils::RunAsAdmin() ? 0 : 1;
@@ -368,7 +363,7 @@ int main(int argc, char *argv[])
 	{
 		Sleep(10000000);
 	}
-#if 0
+#if TEST
     CCommand cmd;
     switch (CServerSocket::GetInstance()->Run(&CCommand::RunCommand, &cmd))
     {

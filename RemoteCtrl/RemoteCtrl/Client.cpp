@@ -42,7 +42,7 @@ Client::~Client()
 	m_error.reset();
 }
 
-int Client::Recv()
+int Client::ParseCommand()
 {
 #if 0
 	CUtils::Dump((BYTE*)m_recv->m_buffer.data(), m_received);
@@ -70,7 +70,7 @@ int Client::Recv()
 			&m_received,
 			&m_flags,
 			// IOCP->recv overlapped->recv worker
-			/*&m_recv->m_overlapped*/NULL,
+			&m_recv->m_overlapped,
 			NULL);
 		if (ret == SOCKET_ERROR)
 		{
@@ -97,12 +97,16 @@ int Client::Recv()
 			memmove(buf, buf + parsed, buf_size - parsed);
 			index -= parsed;
 			m_cmdParsed.store(TRUE);
-			Send();
 			return 0;
 		}
 		// continue recv
 	}
 	return -1;
+}
+
+int Client::Recv()
+{
+	return 0;
 }
 
 void Client::SetOverlapped(Client* ptr)
@@ -119,10 +123,8 @@ int Client::Send()
 	{
 		return -1;
 	}
-	// 2. get cmd
 	if (m_packet.sCmd > 0)
 	{
-		// 4. fill packets
 		m_spCmd->ExecuteCommand(m_packet.sCmd, m_queue, m_packet);
 	}
 	else
@@ -131,9 +133,13 @@ int Client::Send()
 		return -1;
 	}
 	m_sendFinish.store(FALSE);
-	m_queue.AsyncSendAll();
+	// block mode, in queue, it's unblock mode, jump to send worker
+	m_queue.SendAll();
 	m_sendFinish.store(TRUE);
-	//CloseClient();
+	if (m_sendFinish)
+	{
+		CloseClient();
+	}
 	return 0;
 }
 
@@ -149,10 +155,11 @@ void Client::CloseClient()
 BOOL Client::SendPacket(CPacket& packet)
 {
 	if (m_socket == INVALID_SOCKET) return FALSE;
-	memset(m_send->m_wsabuf.buf, 0, m_send->m_wsabuf.len);
-	memcpy(m_send->m_wsabuf.buf, packet.GetData(), packet.Size());
-	int ret = WSASend(m_socket, &m_send->m_wsabuf,
-		// IOCP -> send overlapped -> Send Worker
+	//memset(m_send->m_wsabuf.buf, 0, m_send->m_wsabuf.len);
+	//memcpy(m_send->m_wsabuf.buf, packet.GetData(), packet.Size());
+	WSABUF buf = { packet.Size(), (char *)packet.GetData() };
+	int ret = WSASend(m_socket, &buf,
+		// IOCP -> send overlapped -> Send Worker, NULL overlapped, not trigger worker
 		1, &m_sent, m_flags, /*&m_send->m_overlapped*/NULL, NULL);
 	if (ret != 0)
 	{
@@ -194,58 +201,6 @@ LPOVERLAPPED Client::GetSendOverLapped()
 LPOVERLAPPED Client::GetErrorOverLapped()
 {
 	return &m_error->m_overlapped;
-}
-
-int Client::ProcessCommand()
-{
-	int cmd = ParseCommand();
-	if (cmd > 0)
-	{
-		// command using nCmd + incoming packet(msg from client)
-		// push ack packets got from Command to send queue.
-		m_spCmd->ExecuteCommand(cmd, m_queue, m_packet);
-		return cmd;
-	}
-	return -1;
-}
-
-int Client::ParseCommand()
-{
-	char* buf = m_recv->m_wsabuf.buf;
-	if (!buf)
-	{
-		TRACE("m_recv->m_wsabuf.buf is NULL\n");
-		return -2;
-	}
-	while (TRUE)
-	{
-		if (m_received < 0)
-		{
-			return -1;
-		}
-
-		// potential issue.
-		m_used = m_received;
-		m_packet = CPacket((BYTE*)buf, m_used);
-		if (m_used > 0)
-		{
-			// move unparse bytes leftover to head of buffer(parsed bytes),
-			memmove(buf, buf + m_used, m_recv->m_wsabuf.len - m_used);
-			// after moving, the unused spacec for receiving data
-			m_received -= (DWORD)m_used;
-			return m_packet.sCmd;
-		}
-		// if cannot parse a packet, continue receiving.
-		//int ret = WSARecv(
-		//	m_socket,
-		//	&m_recv->m_wsabuf,
-		//	1,
-		//	&m_received,
-		//	&m_flags,
-		//	&m_recv->m_overlapped,
-		//	NULL);
-	}
-	return -1;
 }
 
  LPDWORD Client::GetReceived()

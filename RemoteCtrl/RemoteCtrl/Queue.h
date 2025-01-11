@@ -17,7 +17,7 @@ public:
 	virtual bool PopFront(T& data);
 	bool Clear();
 	size_t Size();
-	bool AsyncSendAll();
+	bool SendAll();
 	enum {
 		QNONE,
 		QPUSH,
@@ -176,7 +176,7 @@ inline size_t CQueue<T>::Size()
 }
 
 template<class T>
-inline bool CQueue<T>::AsyncSendAll()
+inline bool CQueue<T>::SendAll()
 {
 	if (!IsValid())
 	{

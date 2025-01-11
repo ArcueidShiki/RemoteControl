@@ -21,25 +21,24 @@ public:
 	Client(CMD_SPTR &cmd);
 	~Client();
 	int Recv();
+	int ParseCommand();
 	int Send();
 	void CloseClient();
 	BOOL SendPacket(CPacket& packet);
 	void SetOverlapped(Client* ptr);
-	 SOCKET GetSocket() const;
-	 PVOID GetBuffer();
-	 LPDWORD GetReceived();
-	 SOCKADDR_IN** GetLocalAddr();
-	 SOCKADDR_IN** GetRemoteAddr();
-	 size_t GetBufSize();
-	 LPDWORD GetFlags();
-	 LPWSABUF GetRecvWSABuf();
-	 LPWSABUF GetSendWSABuf();
+	SOCKET GetSocket() const;
+	PVOID GetBuffer();
+	LPDWORD GetReceived();
+	SOCKADDR_IN** GetLocalAddr();
+	SOCKADDR_IN** GetRemoteAddr();
+	size_t GetBufSize();
+	LPDWORD GetFlags();
+	LPWSABUF GetRecvWSABuf();
+	LPWSABUF GetSendWSABuf();
 	LPOVERLAPPED GetAcceptOverlapped();
 	LPOVERLAPPED GetRecvOverLapped();
 	LPOVERLAPPED GetSendOverLapped();
 	LPOVERLAPPED GetErrorOverLapped();
-	int ProcessCommand();
-	int ParseCommand();
 public:
 	std::shared_ptr<typename ACCEPT_OVERLAPPED> m_accept; 
 	std::shared_ptr<typename RECV_OVERLAPPED> m_recv;
@@ -60,7 +59,6 @@ private:
 	SOCKADDR_IN* m_laddr;
 	SOCKADDR_IN* m_raddr;
 	std::atomic<BOOL> m_lock;
-	// one client instance, on send queue, because the data packets are separate from other clients
 	CQueue<CPacket> m_queue;
 	CMD_SPTR m_spCmd;
 };
