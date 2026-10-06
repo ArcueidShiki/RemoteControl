@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>RemoteControl</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+<aside class="sidebar">
+  <a class="brand" href="#" aria-label="RemoteControl home"><span class="brand-mark">↗</span><span>Remote<span class="brand-light">Control</span></span></a>
+  <div class="workspace-label">YOUR WORKSPACE</div>
+  <nav aria-label="Main navigation">
+    <button class="nav active" data-page="devices"><span>▦</span> Computers</button>
+    <button class="nav" data-page="lab"><span>◉</span> Connection lab</button>
+    <button class="nav" data-page="settings"><span>⚙</span> Settings</button>
+  </nav>
+  <div class="sidebar-bottom"><span class="small-dot"></span> Local workspace<div>Windows + macOS</div><p>No background scanning.<br>No session recording.</p></div>
+</aside>
+<main>
+  <header><div class="breadcrumb">Workspace <span>/</span> <span id="page-name">Computers</span></div><span class="version">PREVIEW 0.2</span></header>
+  <div id="alert" role="alert" hidden></div>
+  <section id="devices-page" class="page">
+    <div class="page-heading"><div><div class="eyebrow">A LITTLE CLOSER</div><h1>Your computers.</h1><p>Pick a computer. Continue securely in RustDesk.</p></div><button class="primary" id="add-device">＋ Add computer</button></div>
+    <div class="setup-banner" id="setup-banner"><span class="setup-icon">↗</span><div><strong>Connect your remote desktop engine</strong><p>Choose the official RustDesk app once to open your computers from here.</p></div><button class="secondary" id="setup-engine">Set up RustDesk</button></div>
+    <div class="workspace-grid"><div><div class="section-heading"><h2>Saved computers <span id="device-count">0</span></h2><label class="search"><span>⌕</span><input id="search" placeholder="Find a computer" aria-label="Find a computer"></label></div>
+      <div id="device-list"></div>
+      <div id="empty-state"><div class="empty-monitor"><span></span></div><h3>A familiar computer, one click away.</h3><p>Add its RustDesk ID. Only computers you choose are saved.</p><button class="secondary" id="empty-add">Add your first computer</button></div>
+      <div class="local-card"><div class="mini-icon">▣</div><div><strong id="local-name">This computer</strong><p id="local-addresses">Reading local addresses…</p></div><span class="local-badge">LOCAL</span></div>
+    </div>
+    <aside class="session-panel"><div class="section-heading"><h2>Connection</h2><span id="session-badge" class="badge">Ready</span></div><div class="session-symbol">↗</div><h3 id="session-name">Choose a computer</h3><p id="session-description">Your remote desktop opens in RustDesk, where you confirm identity and permissions.</p>
+      <dl class="session-facts"><div><dt>Peer</dt><dd id="peer-id">—</dd></div><div><dt>Peer IP</dt><dd id="peer-ip">Not supplied</dd></div><div><dt>Engine</dt><dd id="engine-summary">Setup needed</dd></div></dl>
+      <div id="connection-actions"><label class="field-label" for="action">Open</label><select id="action"><option value="desktop">Remote desktop</option><option value="files">File transfer</option></select><label class="consent"><input type="checkbox" id="consent"><span>I have permission to connect to this computer.</span></label><button class="primary wide" id="connect" disabled>Continue in RustDesk <span>↗</span></button></div>
+      <div id="handoff-actions" hidden><button class="secondary wide" id="cancel-handoff">Cancel opening</button><button class="secondary wide" id="reset-handoff" hidden>I ended the session in RustDesk</button></div>
+      <p class="footnote">View-only, mouse, keyboard, display quality and disconnect are controlled in RustDesk. This workspace cannot observe or enforce them.</p>
+    </aside></div>
+  </section>
+  <section id="settings-page" class="page" hidden>
+    <div class="page-heading"><div><div class="eyebrow">MAKE IT YOURS</div><h1>Keep the setup simple.</h1><p>One engine. Your own computers. Clear boundaries.</p></div></div>
+    <article class="settings-card"><div class="section-heading"><h2>Remote desktop engine</h2><span class="badge">External app</span></div><h3>RustDesk</h3><p>Use an official, current RustDesk installation. Authentication, encryption, peer verification and host permissions remain in that app.</p><code id="engine-path">No application selected</code><div class="button-row"><button class="primary" id="choose-engine">Choose RustDesk</button><button class="secondary" id="engine-docs">Setup guide ↗</button></div><p class="footnote">RustDesk is not bundled. Its existing server configuration is used unchanged. No password, VPN credentials or unattended-access setting is stored here.</p></article>
+    <div class="two-cards"><article class="settings-card"><h2>Permission comes first</h2><p>Ask the owner to approve access in RustDesk. Select view-only there before interacting. File transfer has its own host permission.</p><p>No direct-IP launch is provided: an IP address alone does not establish peer identity or encryption.</p></article><article class="settings-card"><h2>What stays local</h2><p>Computer names, RustDesk IDs, optional IP labels and the selected engine path are saved on this computer.</p><p>No passwords, clipboard contents, screen recordings or analytics are collected.</p></article></div>
+    <article class="settings-card"><h2>About this milestone</h2><p>The shared Windows/macOS UI replaces MFC. Remote sessions open in the external RustDesk window. The local lab measures a separate synthetic WebRTC path; it is not a RustDesk performance result.</p><p class="footnote">Repository license unchanged (GPL v2 file). RustDesk is independently licensed AGPL-3.0. No RustDesk source is copied or linked. Engine redistribution and deeper integration need a license review.</p></article>
+  </section>
+  <section id="lab-page" class="page" hidden>
+    <div class="page-heading"><div><div class="eyebrow">MEASURE, DON'T GUESS</div><h1>Connection lab.</h1><p>Real WebRTC. Synthetic pixels. Only this computer.</p></div><span class="badge">Local test</span></div>
+    <div class="lab-toolbar"><label>Source resolution<select id="lab-resolution"><option value="1080">1920 × 1080 · Full HD</option><option value="1440">2560 × 1440 · QHD</option><option value="2160">3840 × 2160 · 4K UHD</option></select></label><button class="primary" id="lab-start">Start local test</button><button class="secondary" id="lab-stop" disabled>Stop</button><span id="lab-state" role="status">No test running</span></div>
+    <div class="lab-screen"><video id="lab-video" autoplay playsinline muted></video><div id="lab-placeholder"><span>◉</span><h3>See what this computer can deliver.</h3><p>No screen capture or remote host is involved.</p></div></div>
+    <div class="metrics"><div><span>Received resolution</span><strong id="metric-resolution">—</strong></div><div><span>Decoded frames / second</span><strong id="metric-fps">—</strong></div><div><span>Input echo round trip</span><strong id="metric-rtt">—</strong></div><div><span>Video codec</span><strong id="metric-codec">—</strong></div></div>
+    <div class="input-lab"><button class="secondary" id="lab-ping" disabled>Test mouse round trip</button><input id="lab-keyboard" aria-label="Keyboard echo test" placeholder="Focus here to test a key event" disabled><span id="lab-echo">No input sent</span></div>
+    <p class="footnote">Canvas source requests 30 FPS. Measurements show actual received video and data-channel echo, not remote input-to-display latency. No STUN/TURN service, screen capture, clipboard or content recording is used. Resolution and frame rate may adapt to this computer's capacity.</p>
+    <canvas id="lab-source" hidden></canvas>
+  </section>
+</main>
+<dialog id="device-dialog"><form id="device-form"><div class="dialog-heading"><div><div class="eyebrow">YOUR COMPUTERS</div><h2>Add a computer</h2></div><button type="button" id="close-dialog" class="icon-button" aria-label="Close add computer">×</button></div><label class="field-label" for="device-name">Computer name</label><input id="device-name" maxlength="60" placeholder="My studio computer" required><label class="field-label" for="device-id">RustDesk ID</label><input id="device-id" inputmode="numeric" placeholder="123 456 789" maxlength="20" required><p class="field-hint">Find this in RustDesk on the computer you own or have permission to use.</p><label class="field-label" for="device-ip">Peer IP <span class="muted">optional label</span></label><input id="device-ip" placeholder="192.168.1.20"><p class="field-hint">For your reference only. Connections use the verified RustDesk ID flow.</p><p id="device-error" role="alert"></p><div class="button-row dialog-actions"><button type="button" class="secondary" id="cancel-device">Cancel</button><button class="primary" type="submit">Save computer</button></div></form></dialog>
+<script src="app.js"></script>
+</body></html>

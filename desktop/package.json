@@ -1,0 +1,20 @@
+{
+  "name": "remotecontrol-desktop",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Cross-platform device workspace with an external RustDesk engine",
+  "main": "src/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.cjs",
+    "test:ui": "node tests/electron-ui.cjs",
+    "package:win": "node scripts/package.cjs win32 x64",
+    "package:mac": "node scripts/package.cjs darwin arm64"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "@playwright/cli": "0.1.22",
+    "electron": "44.5.1",
+    "playwright-core": "1.60.0"
+  }
+}

@@ -1,0 +1,27 @@
+name: Desktop milestone checks
+on:
+  pull_request:
+    paths: ['desktop/**', '.github/workflows/desktop.yml']
+  push:
+    branches: ['codex/cross-platform-milestone']
+    paths: ['desktop/**', '.github/workflows/desktop.yml']
+permissions:
+  contents: read
+jobs:
+  windows-client:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:ui
+      - run: npm run package:win

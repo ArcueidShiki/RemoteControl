@@ -1,77 +1,22 @@
-# Version Control
+# RemoteControl
 
-```bash
-1. git fetch origin [remote branch name]:[local branch name] # it won't merge to the current branch, unless ":" used to specify merge branch
-2. ~git pull origin main # it will auto merge to the current branch.~
-3. git rebase main --reapply-cherry-picks # resolve conflict to main. keep update ahead from main.
-4. git add .; git commit -s
-5. git push -f origin currentBranch
-6. if directly using git rebase origin/main, you cannot create a pull request, it will automatically rebase to the remtoe reposiotry.
-7. origin/main is the "local" ref to "remote" origin main. git pull origin/main will upadte from local branch named "origin/main"; git pull origin main, will fetch first, to ensure local origin/main updated.
-```
+The active client is now the cross-platform application in [desktop](desktop/README.md). The original MFC client/server source remains in RemoteCtrl for historical reference; it is not used by the new application.
 
-# Configurations:
+## Current milestone
+- Shared Windows/macOS interface with saved computers, local addresses and explicit connection consent.
+- External RustDesk desktop/file-transfer handoff. RustDesk is obtained separately and owns authentication, encrypted sessions, host permissions, mouse/keyboard, media and disconnect.
+- A local synthetic WebRTC lab reports actual decoded resolution/FPS and data-channel echo. It is not a production remote-desktop benchmark.
+- Windows package build support; Mac source/build handoff, with actual Mac testing still required.
 
-`charset=UNICODE`
+See [the architecture and limitations](desktop/docs/CURRENT-ARCHITECTURE.md), [Mac handoff](desktop/docs/MACOS-HANDOFF.md) and [legacy code audit](desktop/docs/LEGACY-AUDIT.md).
 
-## RemoteCtrl (server side)
+## Development
+From desktop, run npm ci, npm test and npm start using Node 22.12 or newer. Build with npm run package:win. Follow desktop/README.md for tests and platform-specific packaging.
 
-**Starup without window(dialog)**
+## Security
+The original server has no authentication or transport encryption and must not be exposed publicly. The new client never falls back to it. Do not weaken Windows account, password, firewall or UAC policies to use this project. No VPN setup or node enrollment is performed by this milestone.
 
-`Alt + Enter -> Configuration Properties -> Linker-> 1. Entry point: mainCRTStartup, 2. SubSystem: Windows.`
+## Review workflow
+Use a task branch, run the relevant tests, open a draft PR, complete independent review and required checks, then merge through the repository's normal protections. Do not force-push another person's work.
 
-```cpp
-#pragma comment(linker, "/subsystem:windwos /entry:WinMainCRTStartup")
-#pragma comment(linker, "/subsystem:windwos /entry:mainCRTStartup")
-#pragma comment(linker, "/subsystem:console /entry:WinMainCRTStartup")
-#pragma comment(linker, "/subsystem:console /entry:mainCRTStartup")
-```
-
-### Memory Detection:
-
-`https://kinddragon.github.io/vld/`
-
-`Alt + Enter -> Configuration Properties -> C/C++ -> General -> Additional Include Directories -> vld (include) directory`
-
-`default: C:\Program Files (x86)\Visual Leak Detector\include`
-
-`Alt + Enter -> Configuration Properties -> Linker -> General -> Additional Library Directories -> vld (lib) directory`
-
-`default: C:\Program Files (x86)\Visual Leak Detector\lib\Win64`
-
-`Alt + Enter -> Configuration Properties -> Linker -> Debugging -> General Debug Info -> FULL`
-
-### Permission:
-
-**Run as Administrator**:
-
-`cmd->secpol.msc->Local Policies->Security Options->`
-
-1. Accounts: Administrator account status -> Enable
-2. Accounts: Limit local account use of blank passwords to console logon only -> Disable
-
-`win + x -> cmd(admin) -> net user Administrator *: set password to blank`
-
-`Alt + Enter -> Configuration Properties -> Linker-> Manifest File -> UAC Execution Level -> requireAdministrator / asInvoker`
-
-``Startup Directoru: cmd->shell:startup``
-
-## Link Option:
-
-``Alt + Enter -> Configuration Properties -> Advanced -> Use of MFC - > Use MFC in Static Library``
-
-# Reflections:
-
-`Design is much more important than functions.`
-
-# TODO:
-
-1. Add keyboard event
-2. Replace terminate thread with atomic flag
-3. Make window resizable
-4. Minimize dialog hide it at task bar
-5. Combine all the modules and components, integration test
-6. Next introduce gtest framework.
-7. CICD pipeline
-
-# Summaries:
+The repository license is unchanged. RustDesk is independently licensed and is not bundled or linked into the new client.
