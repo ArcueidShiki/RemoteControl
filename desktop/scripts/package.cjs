@@ -10,7 +10,7 @@ const fs = require('node:fs/promises');
   const outputs = await packager({ dir: root, out: path.join(root, 'dist'), name: 'RemoteControl', platform, arch,
     electronVersion: require('../package.json').devDependencies.electron, electronZipDir: process.env.ELECTRON_ZIP_DIR || undefined, overwrite: true, asar: true,
     appBundleId: 'org.arcueidshiki.remotecontrol', appCategoryType: 'public.app-category.productivity',
-    ignore: [/^\/tests/, /^\/scripts/, /^\/output/, /^\/dist/, /^\/\.userdata/, /^\/node_modules/, /^\/README\.md/],
+    ignore: [/^\/tests/, /^\/scripts/, /^\/output/, /^\/dist/, /^\/\.userdata/, /^\/\.playwright-cli/, /^\/node_modules/, /^\/README\.md/],
     win32metadata: { ProductName: 'RemoteControl', FileDescription: 'Cross-platform remote desktop workspace' } });
   for (const output of outputs) {
     await fs.copyFile(path.join(root, '..', 'LICENSE'), path.join(output, 'PROJECT-LICENSE.txt'));

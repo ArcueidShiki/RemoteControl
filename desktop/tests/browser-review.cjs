@@ -8,11 +8,11 @@ const { EventEmitter } = require('node:events');
 const { DeviceStore, EngineLauncher } = require('../src/core.cjs');
 const root = path.resolve(__dirname, '..');
 const store = new DeviceStore(path.join(root, '.userdata', 'browser-review', 'devices.json'));
-const launcher = new EngineLauncher({ delay: 1200, spawn: () => {
+const launcher = new EngineLauncher({ delay: 1200, workingDirectory: root, verify: async () => ({ ready: true, verified: true }), spawn: () => {
   const child = new EventEmitter(); child.unref = () => {};
   setImmediate(() => child.emit('spawn')); return child;
 } });
-const snapshot = () => ({ devices: store.data.devices, engine: { ready: true, path: 'TEST ADAPTER — no real engine launched' },
+const snapshot = () => ({ devices: store.data.devices, engine: { ready: true, verified: true, message: 'RustDesk test fixture; no engine is launched.', path: 'TEST ADAPTER - no real engine launched' },
   local: { name: 'Local test computer', addresses: ['127.0.0.1'], platform: 'win32' }, session: launcher.state, testMode: true });
 const bridge = [
   'let callback; const invoke=async(method,value)=>{const response=await fetch("/api/"+method,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(value??null)});return response.json()};',

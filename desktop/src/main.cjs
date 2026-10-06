@@ -5,6 +5,7 @@ const os = require('node:os');
 const fs = require('node:fs/promises');
 const { pathToFileURL } = require('node:url');
 const { DeviceStore, EngineLauncher } = require('./core.cjs');
+const { verifyEngine } = require('./engine.cjs');
 
 const testing = process.env.REMOTECONTROL_TEST === '1' && !app.isPackaged;
 if (process.env.REMOTECONTROL_PROFILE) app.setPath('userData', path.resolve(process.env.REMOTECONTROL_PROFILE));
@@ -14,9 +15,8 @@ function localAddresses() {
   return Object.values(os.networkInterfaces()).flat().filter(x => x && !x.internal && x.family === 'IPv4').map(x => x.address);
 }
 async function engineStatus() {
-  const executable = store.data.enginePath;
-  try { const stat = await fs.stat(executable); if (stat.isFile()) return { ready: true, path: executable }; } catch {}
-  return { ready: false, path: executable };
+  if (testing) return { ready: true, verified: true, path: store.data.enginePath, message: 'RustDesk test fixture; no engine is launched.' };
+  return verifyEngine(store.data.enginePath);
 }
 async function snapshot() {
   return { devices: store.data.devices, engine: await engineStatus(), local: { name: os.hostname(), platform: process.platform, addresses: localAddresses() },
@@ -44,14 +44,16 @@ app.whenReady().then(async () => {
   session.defaultSession.webRequest.onBeforeRequest((details, callback) => callback({ cancel: !details.url.startsWith('workspace://app/') && !details.url.startsWith('file://') }));
   store = new DeviceStore(path.join(app.getPath('userData'), 'devices.json'));
   await store.load();
+  const workingDirectory = path.join(app.getPath('userData'), 'engine-working-directory');
+  await fs.mkdir(workingDirectory, { recursive: true, mode: 0o700 });
   if (testing) {
     const { EventEmitter } = require('node:events');
-    launcher = new EngineLauncher({ delay: 1200, spawn: () => {
+    launcher = new EngineLauncher({ delay: 1200, workingDirectory, verify: async () => ({ ready: true, verified: true }), spawn: () => {
       const child = new EventEmitter(); child.unref = () => {};
       setImmediate(() => child.emit(process.env.REMOTECONTROL_TEST_FAIL_ENGINE ? 'error' : 'spawn', new Error('fixture')));
       return child;
     } });
-  } else launcher = new EngineLauncher();
+  } else launcher = new EngineLauncher({ workingDirectory });
   window = new BrowserWindow({ width: 1200, height: 830, minWidth: 900, minHeight: 690, title: 'RemoteControl', backgroundColor: '#f5f7fb', show: !testing,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, backgroundThrottling: !testing, devTools: !app.isPackaged } });
   window.setMenuBarVisibility(false);
@@ -63,16 +65,13 @@ app.whenReady().then(async () => {
   handler('workspace:remove-device', async id => { if (launcher.state.phase === 'preparing' || launcher.state.phase === 'handed-off') throw new Error('Finish the current handoff first.'); await store.remove(String(id)); return snapshot(); });
   handler('workspace:choose-engine', async () => {
     if (launcher.state.phase === 'preparing' || launcher.state.phase === 'handed-off') throw new Error('Finish the current handoff first.');
-    const result = await dialog.showOpenDialog(window, { title: 'Choose the official RustDesk application', properties: ['openFile'], filters: process.platform === 'win32' ? [{ name: 'RustDesk executable', extensions: ['exe'] }] : [] });
+    const result = await dialog.showOpenDialog(window, { title: 'Choose RustDesk for verification', properties: ['openFile'], filters: process.platform === 'win32' ? [{ name: 'RustDesk executable', extensions: ['exe'] }] : [] });
     if (result.canceled) return snapshot();
     let executable = result.filePaths[0];
     if (process.platform === 'darwin' && executable.endsWith('.app')) executable = path.join(executable, 'Contents', 'MacOS', 'RustDesk');
-    if (!/^rustdesk(?:[-\w.]*)?(?:\.exe)?$/i.test(path.basename(executable))) throw new Error('Select the official RustDesk executable. Only RustDesk is supported.');
-    if (!(await fs.stat(executable)).isFile()) throw new Error('RustDesk executable was not found.');
     store.data.enginePath = executable; await store.save(); return snapshot();
   });
   handler('workspace:prepare', async value => {
-    if (!(await engineStatus()).ready) throw new Error('Choose the official RustDesk application in Settings first.');
     const device = store.data.devices.find(d => d.id === value?.id);
     if (!device) throw new Error('Save or choose a computer first.');
     return launcher.prepare(device, value.action, value.consent, store.data.enginePath);

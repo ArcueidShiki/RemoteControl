@@ -65,7 +65,7 @@ async function waitFor(fn, message, timeout = 10000) {
     check(await page.locator('#cancel-handoff').isHidden(), 'post-handoff cancellation does not falsely claim to disconnect');
     if (mode === 'files') await page.screenshot({ path: path.join(evidence, 'cross-platform-handoff.png') });
     await page.locator('#reset-handoff').click();
-    check(!(await page.locator('#consent').isChecked()), 'new attempt requires fresh consent');
+    await waitFor(async () => (await page.locator('#session-badge').textContent()) === 'Ready' && !(await page.locator('#consent').isChecked()), 'new attempt requires fresh consent');
   }
   await page.locator('#search').fill('does not exist');
   check((await page.locator('#device-list').textContent()).includes('No matching'), 'search handles no results');
@@ -96,6 +96,7 @@ async function waitFor(fn, message, timeout = 10000) {
     }
     check(samples.every(s => s.videoWidth > 0 && s.videoHeight > 0 && s.decodedFps > 0), 'requested resolution produces real decoded frames; report actual dimensions');
     measurements.push({ requested: { width: Number(height) * 16 / 9, height: Number(height), fps: 30 }, samples });
+    await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: path.join(evidence, 'cross-platform-lab-' + height + '.png'), fullPage: true });
     await page.locator('#lab-stop').click();
     check(await page.locator('#lab-video').evaluate(video => video.srcObject === null), 'stopping releases the video source');

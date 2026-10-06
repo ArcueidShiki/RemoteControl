@@ -8,6 +8,7 @@ const path = require('node:path');
 const { cleanDevice, launchArguments, DeviceStore, EngineLauncher } = require('../src/core.cjs');
 const device = { name: 'My studio', peerId: '123 456 789', peerIp: '192.168.1.20' };
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+const fixtureOptions = { workingDirectory: os.tmpdir(), verify: async () => ({ ready: true, verified: true }) };
 test('device validation prevents command/URI injection and direct-IP launch', () => {
   assert.equal(cleanDevice(device).peerId, '123456789');
   for (const peerId of ['--password', '123&password=secret', '192.168.1.1', '123456;calc', '../123456', 'rustdesk://123456', '1', '1234567890123'])
@@ -20,7 +21,7 @@ test('device validation prevents command/URI injection and direct-IP launch', ()
 });
 test('permission is required; cancel and repeated cancel cannot spawn', async () => {
   const spawned = [];
-  const engine = new EngineLauncher({ delay: 20, spawn: (...args) => spawned.push(args) });
+  const engine = new EngineLauncher({ ...fixtureOptions, delay: 20, spawn: (...args) => spawned.push(args) });
   assert.throws(() => engine.prepare(device, 'desktop', false, process.execPath));
   assert.throws(() => engine.prepare(device, 'desktop', true, 'relative.exe'));
   engine.prepare(device, 'desktop', true, process.execPath);
@@ -31,11 +32,13 @@ test('permission is required; cancel and repeated cancel cannot spawn', async ()
 });
 test('handoff uses shell-free bounded arguments and never reports a connection', async () => {
   let child, captured;
-  const engine = new EngineLauncher({ delay: 5, spawn: (...args) => { captured = args; child = new EventEmitter(); child.unref = () => {}; setImmediate(() => child.emit('spawn')); return child; } });
+  const engine = new EngineLauncher({ ...fixtureOptions, delay: 5, spawn: (...args) => { captured = args; child = new EventEmitter(); child.unref = () => {}; setImmediate(() => child.emit('spawn')); return child; } });
   for (const action of ['desktop', 'files', 'desktop']) {
     engine.prepare(device, action, true, process.execPath); await pause(30);
     assert.equal(engine.state.phase, 'handed-off');
     assert.equal(captured[2].shell, false);
+    assert.equal(captured[2].cwd, os.tmpdir());
+    assert.notEqual(captured[2].env, process.env);
     assert.equal(captured[1].length, 2);
     assert.equal(captured[1][0], action === 'files' ? '--file-transfer' : '--connect');
     child.emit('exit', 0);
@@ -47,7 +50,7 @@ test('handoff uses shell-free bounded arguments and never reports a connection',
 });
 test('failed engine launch can be retried; late events cannot revive reset state', async () => {
   let child;
-  const engine = new EngineLauncher({ delay: 1, spawn: () => { child = new EventEmitter(); child.unref = () => {}; setImmediate(() => child.emit('error', new Error('ENOENT'))); return child; } });
+  const engine = new EngineLauncher({ ...fixtureOptions, delay: 1, spawn: () => { child = new EventEmitter(); child.unref = () => {}; setImmediate(() => child.emit('error', new Error('ENOENT'))); return child; } });
   engine.prepare(device, 'desktop', true, process.execPath); await pause(25);
   assert.equal(engine.state.phase, 'error');
   engine.prepare(device, 'desktop', true, process.execPath); await pause(25);
@@ -56,7 +59,7 @@ test('failed engine launch can be retried; late events cannot revive reset state
 });
 test('closing pending handoff stops the launch', async () => {
   let count = 0;
-  const engine = new EngineLauncher({ delay: 20, spawn: () => { count++; } });
+  const engine = new EngineLauncher({ ...fixtureOptions, delay: 20, spawn: () => { count++; } });
   engine.prepare(device, 'desktop', true, process.execPath); engine.dispose();
   await pause(50); assert.equal(count, 0);
 });

@@ -7,6 +7,7 @@ The active client is now the cross-platform application in [desktop](desktop/REA
 - External RustDesk desktop/file-transfer handoff. RustDesk is obtained separately and owns authentication, encrypted sessions, host permissions, mouse/keyboard, media and disconnect.
 - A local synthetic WebRTC lab reports actual decoded resolution/FPS and data-channel echo. It is not a production remote-desktop benchmark.
 - Windows package build support; Mac source/build handoff, with actual Mac testing still required.
+- Engine launch accepts only the reviewed Windows release digest; changed/unverified files and Mac engine launch are blocked pending identity review.
 
 See [the architecture and limitations](desktop/docs/CURRENT-ARCHITECTURE.md), [Mac handoff](desktop/docs/MACOS-HANDOFF.md) and [legacy code audit](desktop/docs/LEGACY-AUDIT.md).
 

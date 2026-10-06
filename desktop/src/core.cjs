@@ -4,6 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
 const { spawn } = require('node:child_process');
+const { verifyEngine, engineProcessOptions } = require('./engine.cjs');
 
 function cleanDevice(value) {
   if (!value || typeof value !== 'object') throw new Error('Enter a computer name and RustDesk ID.');
@@ -56,6 +57,7 @@ class DeviceStore {
 class EngineLauncher extends EventEmitter {
   constructor(options = {}) {
     super(); this.spawn = options.spawn || spawn; this.delay = options.delay ?? 1200;
+    this.verify = options.verify || verifyEngine; this.workingDirectory = options.workingDirectory;
     this.state = { phase: 'idle', message: 'Choose a saved computer or add one to get started.' };
     this.timer = null; this.generation = 0;
   }
@@ -64,15 +66,23 @@ class EngineLauncher extends EventEmitter {
     if (this.state.phase !== 'idle' && this.state.phase !== 'error') throw new Error('Finish or cancel the current handoff first.');
     if (consent !== true) throw new Error('Confirm that you have permission to connect.');
     const args = launchArguments(device, action);
-    if (!enginePath || !path.isAbsolute(enginePath)) throw new Error('Choose the official RustDesk application in Settings first.');
+    if (!enginePath || !path.isAbsolute(enginePath)) throw new Error('Choose the verified RustDesk release in Settings first.');
     const generation = ++this.generation;
     this.update({ phase: 'preparing', device: cleanDevice(device), action, message: 'Opening RustDesk shortly. You can still cancel.' });
-    this.timer = setTimeout(() => {
+    this.timer = setTimeout(async () => {
       if (generation !== this.generation) return;
       this.timer = null;
       let child;
-      try { child = this.spawn(enginePath, args, { shell: false, windowsHide: false, stdio: 'ignore', detached: true }); }
-      catch { return this.update({ ...this.state, phase: 'error', message: 'RustDesk could not be opened. Check the selected application in Settings.' }); }
+      try {
+        const identity = await this.verify(enginePath);
+        if (generation !== this.generation) return;
+        if (!identity.ready || !identity.verified) return this.update({ ...this.state, phase: 'error', engineInvalid: true, message: identity.message || 'Unverified application. Launch blocked.' });
+        child = this.spawn(enginePath, args, engineProcessOptions(this.workingDirectory));
+      }
+      catch {
+        if (generation === this.generation) this.update({ ...this.state, phase: 'error', message: 'RustDesk could not be opened. Check the selected application in Settings.' });
+        return;
+      }
       child.once('error', () => {
         if (generation === this.generation) this.update({ ...this.state, phase: 'error', message: 'RustDesk could not be opened. Check the selected application in Settings.' });
       });

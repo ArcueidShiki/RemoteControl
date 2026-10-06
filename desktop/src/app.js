@@ -61,7 +61,8 @@ function render() {
   $('local-addresses').textContent = model.local.addresses.length ? 'Local IPv4 · ' + model.local.addresses.join(' · ') : 'Loopback · 127.0.0.1';
   $('setup-banner').hidden = model.engine.ready;
   $('engine-path').textContent = model.engine.path || 'No application selected';
-  $('engine-summary').textContent = model.engine.ready ? 'RustDesk · external' : 'Setup needed';
+  $('engine-verification').textContent = model.engine.message || '';
+  $('engine-summary').textContent = model.engine.ready ? 'RustDesk · verified' : model.engine.path ? 'Unverified · blocked' : 'Setup needed';
   $('session-name').textContent = device?.name || 'Choose a computer';
   $('peer-id').textContent = device?.peerId || '—';
   $('peer-ip').textContent = device?.peerIp ? device.peerIp + ' (label)' : 'Not supplied';
@@ -86,7 +87,7 @@ $('reset-handoff').addEventListener('click', () => action(async () => { model.se
 $('setup-engine').addEventListener('click', () => page('settings'));
 $('choose-engine').addEventListener('click', () => action(async () => { model = await call(api.chooseEngine()); render(); }));
 $('engine-docs').addEventListener('click', () => action(() => call(api.documentation())));
-api.onSession(state => { if (model) { model.session = state; render(); } });
+api.onSession(state => { if (model) { model.session = state; render(); if (state.engineInvalid) action(async () => { model = await call(api.snapshot()); render(); }); } });
 action(async () => { model = await call(api.snapshot()); render(); if (model.loadError) alertMessage(model.loadError); });
 
 // A local-only lab, independent of the external RustDesk engine. Generated
