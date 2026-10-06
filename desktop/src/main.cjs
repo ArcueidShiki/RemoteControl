@@ -9,8 +9,18 @@ const { verifyEngine } = require('./engine.cjs');
 
 const testing = process.env.REMOTECONTROL_TEST === '1' && !app.isPackaged;
 if (process.env.REMOTECONTROL_PROFILE) app.setPath('userData', path.resolve(process.env.REMOTECONTROL_PROFILE));
-protocol.registerSchemesAsPrivileged([{ scheme: 'workspace', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
-let window, store, launcher;
+// Acquire ownership of this userData profile before constructing or accessing
+// any persistent store. Losing instances never enter application startup.
+const ownsProfile = app.requestSingleInstanceLock();
+let window, store, launcher, windowReady = false, focusWhenReady = false;
+function focusWorkspace() {
+  focusWhenReady = true;
+  if (!windowReady || !window || window.isDestroyed()) return;
+  focusWhenReady = false;
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
+}
 function localAddresses() {
   return Object.values(os.networkInterfaces()).flat().filter(x => x && !x.internal && x.family === 'IPv4').map(x => x.address);
 }
@@ -30,7 +40,7 @@ function handler(channel, fn) {
     catch (error) { return { ok: false, error: error.message || 'The action could not be completed.' }; }
   });
 }
-app.whenReady().then(async () => {
+async function openWorkspace() {
   protocol.handle('workspace', request => {
     const url = new URL(request.url);
     const allowed = new Set(['/index.html', '/app.js', '/style.css']);
@@ -59,7 +69,7 @@ app.whenReady().then(async () => {
   window.setMenuBarVisibility(false);
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', event => event.preventDefault());
-  launcher.on('state', state => { if (!window.isDestroyed()) window.webContents.send('workspace:session', state); });
+  launcher.on('state', state => { if (window && !window.isDestroyed()) window.webContents.send('workspace:session', state); });
   handler('workspace:snapshot', snapshot);
   handler('workspace:save-device', async value => { await store.put(value); return snapshot(); });
   handler('workspace:remove-device', async id => { if (launcher.state.phase === 'preparing' || launcher.state.phase === 'handed-off') throw new Error('Finish the current handoff first.'); await store.remove(String(id)); return snapshot(); });
@@ -86,7 +96,19 @@ app.whenReady().then(async () => {
       if (choice === 0) event.preventDefault();
     }
   });
+  window.on('closed', () => { windowReady = false; window = null; });
   await window.loadURL('workspace://app/index.html');
-});
-app.on('window-all-closed', () => app.quit());
-app.on('before-quit', () => launcher?.dispose());
+  windowReady = true;
+  if (focusWhenReady) focusWorkspace();
+}
+if (!ownsProfile) {
+  app.quit();
+} else {
+  protocol.registerSchemesAsPrivileged([{ scheme: 'workspace', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
+  // A second launch only restores/focuses the existing workspace. Ignore its
+  // arguments and working directory; they never start sessions or edit data.
+  app.on('second-instance', focusWorkspace);
+  app.whenReady().then(openWorkspace);
+  app.on('window-all-closed', () => app.quit());
+  app.on('before-quit', () => launcher?.dispose());
+}

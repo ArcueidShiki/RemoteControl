@@ -10,6 +10,13 @@ This first milestone is an explicit separate-process integration. It is not an e
 
 The renderer loads packaged local files through a restricted custom protocol. It has context isolation and Chromium sandboxing enabled, no Node integration, a restrictive CSP, no arbitrary shell/file bridge and no navigation/popups. IPC accepts only the app's main frame. Devices and settings contain no credentials. String fields render through textContent.
 
+Before any store access, the process must obtain Electron's single-instance lock
+for its selected userData profile. Losing instances quit without constructing a
+store or window. Later launches only restore/show/focus the existing workspace;
+their arguments are ignored. A focus request during initial loading is deferred
+until the window is ready. This prevents two normal app instances from retaining
+independent stale snapshots and replacing the same devices.json/.tmp files.
+
 The RustDesk adapter accepts numeric IDs and fixed desktop/file-transfer commands. It uses argument arrays with shell:false and requires fresh explicit user consent. It never supplies a password, changes RustDesk configuration, starts its installer, alters host permissions, enrolls a VPN node or opens a firewall rule. Direct-IP connections are excluded because an IP alone is not authenticated identity.
 
 Only the reviewed RustDesk 1.5.0 Windows x64 portable executable is currently allowed. The verifier checks a pinned official release digest on selection/restoration and again after the cancel delay, immediately before spawn. Saved paths are not saved trust decisions. Changed files and unsupported platforms display Unverified and cannot launch; macOS needs its own reviewed identity before engine acceptance. Standard filenames are restricted because RustDesk can derive configuration from custom executable names. The minimal environment passes OS profile/temp directories and a fixed system PATH, omitting inherited shell/CI secrets, proxies and loader settings. A dedicated app userData subdirectory is the deliberate cwd. These checks do not make an external engine a sandbox or defend against a malicious same-user process racing the local filesystem/loader.

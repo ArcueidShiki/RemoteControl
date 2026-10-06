@@ -26,6 +26,7 @@ jobs:
       - run: npm run test:ui
       - run: npm run package:win
       - run: npm run test:packaged
+      - run: npm run test:instances
       - name: Verify reviewed engine and version-only invocation
         shell: pwsh
         run: |

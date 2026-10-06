@@ -9,6 +9,12 @@ Use Node 22.12+:
 - npm test
 - npm run test:ui
 
+The workspace acquires Electron's single-instance lock before accessing saved
+settings. Launching it again restores/focuses the existing window, including
+when the first window is still loading, and never forwards a connection command.
+Only the owning process opens or writes the device store. Separately configured
+test profiles remain separate from the normal profile.
+
 In Settings, select the official RustDesk 1.5.0 Windows x64 portable release, named rustdesk-1.5.0-x86_64.exe or rustdesk.exe. The app checks its SHA-256 content digest on selection, restored settings and immediately before each launch. Other versions/builds, renamed impostors, changed files and unreviewed platforms are blocked and labeled Unverified. Filename alone never establishes trust. Add a computer's RustDesk ID, confirm permission and continue. Desktop and file-transfer actions open RustDesk's own window. Complete authentication, verify the peer, choose view-only/control and disconnect there. A peer IP entered here is a label, not verified session metadata.
 
 RustDesk is not bundled or silently installed. Obtain the reviewed asset separately from https://github.com/rustdesk/rustdesk/releases/tag/1.5.0. Its pinned SHA-256 is 8555777215510d83d2d61c9dc984e4fcc838bd7e79f9d18a42585431f5e8bb47 (25,887,600 bytes). The digest was matched to the official release metadata; the downloaded Windows signature was also checked during review. Runtime verification uses the pinned digest, not a claim of continuous Authenticode validation. New releases require a reviewed application update. This adapter passes only --connect ID or --file-transfer ID, never passwords, configuration changes, installation/elevation flags or shell text. It does not contact the legacy server.
@@ -37,6 +43,14 @@ The repository license remains unchanged (GPL v2 file at ../LICENSE). Electron i
 Renderer: sandboxed, context isolation, Node integration off, restrictive CSP, packaged local assets only. IPC validates the sender and exposes specific methods rather than arbitrary shell/file APIs. Engine launch uses spawn with shell:false, fixed argument arrays, a minimal OS-directory environment and a fixed system search path. Shell/CI secrets, proxy settings and loader-injection variables are not inherited. The working directory is a dedicated folder in the app's userData directory. File verification and launch assume a trusted local account/filesystem; they do not sandbox RustDesk or defend against a malicious same-user process racing the OS loader. Permission defaults off and resets per attempt. No remote fonts, analytics or auto-updater.
 
 CI runs npm run test:packaged against the built ASAR application to check production verification and that development mock flags are ignored. node tests/trusted-engine.cjs ABSOLUTE_PATH performs real release verification, saved-path restoration and changed-file rejection with captured handoff arguments; it does not execute RustDesk. The optional --probe-version executes only --version and is restricted to disposable GitHub-hosted Windows runners because the upstream portable wrapper extracts into its Windows profile. This version probe is not a remote session test.
+
+After packaging, npm run test:instances runs a real two-process regression on a
+private/CI desktop. It repeats launches while the owner saves data, verifies the
+second process exits and the existing minimized/hidden window restores and
+requests focus, checks that devices and engine path are preserved, and restarts
+the owner to verify lock release and persistence. It never launches RustDesk.
+Do not run native GUI tests while another operator controls shared windows.
+API reference: https://www.electronjs.org/docs/latest/api/app#apprequestsingleinstancelockadditionaldata
 
 ## Next acceptance stage
 Use two explicitly authorized owned machines to validate the actual RustDesk path: verify identities, reject invalid credentials, deny/revoke view/control, test mouse/keyboard and file transfer, close/disconnect/reconnect, and measure actual 1080p/QHD/4K performance on direct and approved relay/VPN routes. Deeper integration requires a supported engine session API or a reviewed native/WebRTC implementation. The current CLI cannot truthfully provide embedded session controls.

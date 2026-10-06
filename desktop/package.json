@@ -9,6 +9,7 @@
     "test": "node --test tests/*.test.cjs",
     "test:ui": "node tests/electron-ui.cjs",
     "test:packaged": "node tests/packaged-smoke.cjs",
+    "test:instances": "node tests/packaged-single-instance.cjs",
     "test:engine": "node tests/trusted-engine.cjs",
     "package:win": "node scripts/package.cjs win32 x64",
     "package:mac": "node scripts/package.cjs darwin arm64"
