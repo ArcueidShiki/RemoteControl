@@ -58,6 +58,24 @@ Wizard checks cover every cancel step, Escape, back/forward, invalid IDs/IPs,
 double save, no premature persistence, and fresh consent. Additional browser
 failure injection covers refresh/save retry and a 900px-wide layout.
 
+Review found an inherited store defect: writes changed memory before the disk
+save completed, so a failed/canceled edit could leak into later saves. The store
+now serializes candidate writes and publishes an immutable snapshot only after
+the temporary file is successfully renamed. Device changes, removal and engine
+path selection share that transaction. A failed save leaves committed memory and
+disk unchanged. Stable error codes select the Chinese ID/save messages; both ID
+entry paths assert the complete translated message, including its punctuation.
+
+`node tests/wizard-storage.cjs` runs a separate native Electron regression in CI:
+an isolated profile contains a real filesystem obstruction, and the test checks
+repeated failed saves, the full Chinese error, cancel, refresh, later successful
+double-save and process restart. Only the later device may exist in memory/disk.
+For headless local review set `REMOTECONTROL_STORAGE_BROWSER=1`; the loopback fixture
+uses the same actual store/filesystem, without mocking the save response. Unit
+tests also cover failed updates/removal/engine path, rename failure and concurrent
+queued edits. The earlier HTTP failure test remains a transport-retry check; it
+does not establish filesystem transaction behavior.
+
 electron-builder 26.15.3 is pinned as a development dependency. npm audit on
 2026-10-07 reported eight moderate entries along one transitive chain ending in
 sprintf-js GHSA-hp3w-g68c-fv3c (unbounded format precision / denial of service).

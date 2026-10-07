@@ -22,7 +22,7 @@ test('saved paths and renamed executables do not establish engine trust', () => 
   const executable = path.join(directory, 'rustdesk.exe');
   await fs.copyFile(process.execPath, executable);
   const store = new DeviceStore(path.join(directory, 'devices.json'));
-  store.data.enginePath = executable; await store.save();
+  await store.setEnginePath(executable);
   const restored = new DeviceStore(store.file); await restored.load();
   assert.equal(restored.data.enginePath, executable);
   assert.equal((await verifyEngine(restored.data.enginePath, { platform: 'win32', arch: 'x64' })).verified, false);

@@ -42,7 +42,7 @@ async function waitFor(fn, message, timeout = 10000) {
   await page.locator('#device-name').fill('Studio workstation');
   await page.locator('#device-id').fill('192.168.1.20');
   await page.getByRole('button', { name: '保存电脑', exact: true }).click();
-  await waitFor(async () => (await page.locator('#device-error').textContent()).includes('6–12'), 'direct IP cannot bypass the ID route');
+  await waitFor(async () => (await page.locator('#device-error').textContent()) === '请输入 6–12 位数字 RustDesk ID；这里不能用 IP 直接连接。', 'quick add rejects direct IP with the complete Chinese ID error');
   await page.locator('#device-id').fill('123 456 789');
   await page.locator('#device-ip').fill('192.168.1.20');
   await page.getByRole('button', { name: '保存电脑', exact: true }).click();

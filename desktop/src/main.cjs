@@ -38,7 +38,7 @@ function handler(channel, fn) {
     if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== 'workspace://app/index.html')
       throw new Error('Untrusted request.');
     try { return { ok: true, value: await fn(...args) }; }
-    catch (error) { return { ok: false, error: error.message || 'The action could not be completed.' }; }
+    catch (error) { return { ok: false, code: error.code, error: error.message || 'The action could not be completed.' }; }
   });
 }
 async function openWorkspace() {
@@ -84,7 +84,7 @@ async function openWorkspace() {
     if (result.canceled) return snapshot();
     let executable = result.filePaths[0];
     if (process.platform === 'darwin' && executable.endsWith('.app')) executable = path.join(executable, 'Contents', 'MacOS', 'RustDesk');
-    store.data.enginePath = executable; await store.save(); return snapshot();
+    await store.setEnginePath(executable); return snapshot();
   });
   handler('workspace:prepare', async value => {
     const device = store.data.devices.find(d => d.id === value?.id);

@@ -4,7 +4,7 @@ const api = window.remoteControl;
 let model, selectedId = null, savingDevice = false, wizardStep = 0, wizardBusy = false;
 const busySession = () => model && ['preparing', 'handed-off'].includes(model.session.phase);
 const messages = {
-  'Enter a RustDesk ID with 6-12 digits. Direct IP connections are not supported by this adapter.': '请输入 6–12 位数字 RustDesk ID；这里不能用 IP 直接连接。',
+  'Enter a RustDesk ID with 6–12 digits. Direct IP connections are not supported by this adapter.': '请输入 6–12 位数字 RustDesk ID；这里不能用 IP 直接连接。',
   'Use a computer name between 1 and 60 characters.': '请填写 1–60 个字符的电脑名称。',
   'Peer IP must be a valid IPv4 or IPv6 address, or left blank.': 'IP 备注应为有效的 IPv4 / IPv6 地址，也可以留空。',
   'Saved settings could not be read. No connection was started.': '已保存的设置无法读取。没有发起连接；请先备份并修复设置文件。',
@@ -15,7 +15,11 @@ const messages = {
   'Up to 50 computers can be saved.': '最多保存 50 台电脑，请先移除不再使用的记录。'
 };
 const readable = message => messages[message] || message;
-async function call(promise) { const result = await promise; if (!result.ok) throw new Error(readable(result.error)); return result.value; }
+const errorMessages = {
+  INVALID_PEER_ID: '请输入 6–12 位数字 RustDesk ID；这里不能用 IP 直接连接。',
+  SETTINGS_SAVE_FAILED: '保存失败，原有设置未改变。请检查存储空间和写入权限后重试；也可以取消本次编辑。'
+};
+async function call(promise) { const result = await promise; if (!result.ok) throw new Error(errorMessages[result.code] || readable(result.error)); return result.value; }
 function alertMessage(message = '') { $('alert').textContent = readable(message); $('alert').hidden = !message; }
 async function action(fn) { try { alertMessage(); await fn(); } catch (error) { alertMessage(error.message); } }
 function page(name) {

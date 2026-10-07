@@ -7,7 +7,7 @@ const path = require('node:path');
 const { EventEmitter } = require('node:events');
 const { DeviceStore, EngineLauncher, cleanDevice } = require('../src/core.cjs');
 const root = path.resolve(__dirname, '..');
-const store = new DeviceStore(path.join(root, '.userdata', 'browser-review', 'devices.json'));
+const store = new DeviceStore(path.join(process.argv[2] || path.join(root, '.userdata', 'browser-review'), 'devices.json'));
 const launcher = new EngineLauncher({ delay: 1200, workingDirectory: root, verify: async () => ({ ready: true, verified: true }), spawn: () => {
   const child = new EventEmitter(); child.unref = () => {};
   setImmediate(() => child.emit('spawn')); return child;
@@ -44,7 +44,7 @@ const server = http.createServer(async (request, response) => {
     let content = await fs.readFile(path.join(root, 'src', allowed[url.pathname]), 'utf8');
     if (allowed[url.pathname] === 'index.html') content = content.replace('<script src="app.js">', '<script src="test-bridge.js"></script><script src="app.js">');
     response.setHeader('Content-Type', url.pathname.endsWith('.js') ? 'application/javascript' : url.pathname.endsWith('.css') ? 'text/css' : 'text/html'); response.end(content);
-  } catch (error) { response.setHeader('Content-Type', 'application/json'); response.end(JSON.stringify({ ok: false, error: error.message })); }
+  } catch (error) { response.setHeader('Content-Type', 'application/json'); response.end(JSON.stringify({ ok: false, code: error.code, error: error.message })); }
 });
 store.load().then(() => server.listen(0, '127.0.0.1', () => console.log('Browser review fixture: http://127.0.0.1:' + server.address().port)));
 process.on('SIGINT', () => { launcher.dispose(); server.close(); });

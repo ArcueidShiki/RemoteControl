@@ -25,8 +25,8 @@ module.exports = async function wizardFlow(page, evidence, check) {
   await page.waitForFunction(() => document.getElementById('wizard-error').textContent.includes('名称'));
   await page.locator('#wizard-name').fill('我的 Mac · 向导测试'); await page.locator('#wizard-id').fill('192.168.1.20');
   await page.locator('#wizard-next').click();
-  await page.waitForFunction(() => document.getElementById('wizard-error').textContent.includes('6–12'));
-  check(true, 'wizard validation rejects a direct IP in the identity field');
+  await page.waitForFunction(() => document.getElementById('wizard-error').textContent === '请输入 6–12 位数字 RustDesk ID；这里不能用 IP 直接连接。');
+  check(true, 'wizard rejects a direct IP with the complete Chinese ID error');
   await page.locator('#wizard-id').fill('321 654 987'); await page.locator('#wizard-ip').fill('not-an-ip');
   await page.locator('#wizard-next').click();
   await page.waitForFunction(() => document.getElementById('wizard-error').textContent.includes('IPv4'));
