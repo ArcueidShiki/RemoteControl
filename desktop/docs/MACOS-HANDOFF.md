@@ -3,7 +3,8 @@
 ## Scope and baseline
 
 This document preserves the historical Mac build evidence and current Mac safety
-gates. The active build/debug/test instructions are in [BUILD.md](../../BUILD.md).
+gates. Active build/debug/test instructions are in the source repository's root
+BUILD.md. In a packaged copy, use SOURCE-REFERENCE.json's sourceUrl to find it.
 The later cleanup removes retired MFC projects, not this handoff or the shared
 macos-stage.cjs module used by both platforms. Historical Mac results below do
 not establish native acceptance of the current shared HEAD.
