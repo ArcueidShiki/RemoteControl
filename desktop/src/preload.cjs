@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('remoteControl', {
   snapshot: () => ipcRenderer.invoke('workspace:snapshot'),
   saveDevice: value => ipcRenderer.invoke('workspace:save-device', value),
+  validateDevice: value => ipcRenderer.invoke('workspace:validate-device', value),
   removeDevice: id => ipcRenderer.invoke('workspace:remove-device', id),
   chooseEngine: () => ipcRenderer.invoke('workspace:choose-engine'),
   prepare: value => ipcRenderer.invoke('workspace:prepare', value),

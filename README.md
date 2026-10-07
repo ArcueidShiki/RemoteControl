@@ -12,7 +12,7 @@ The active client is now the cross-platform application in [desktop](desktop/REA
 See [the architecture and limitations](desktop/docs/CURRENT-ARCHITECTURE.md), [Mac handoff](desktop/docs/MACOS-HANDOFF.md) and [legacy code audit](desktop/docs/LEGACY-AUDIT.md).
 
 ## Development
-From desktop, run npm ci, npm test and npm start using Node 22.12 or newer. Build with npm run package:win. Follow desktop/README.md for tests and platform-specific packaging.
+From desktop, run npm ci, npm test and npm start using Node 22.12 or newer. Windows installers require a clean committed checkout and an explicit HEAD: npm run package:win -- $(git rev-parse HEAD). Follow desktop/README.md for platform packaging and [the new connection wizard](desktop/docs/WIZARD-INSTALLER.md).
 
 ## Security
 The original server has no authentication or transport encryption and must not be exposed publicly. The new client never falls back to it. Do not weaken Windows account, password, firewall or UAC policies to use this project. No VPN setup or node enrollment is performed by this milestone.

@@ -5,9 +5,9 @@ const http = require('node:http');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
-const { DeviceStore, EngineLauncher } = require('../src/core.cjs');
+const { DeviceStore, EngineLauncher, cleanDevice } = require('../src/core.cjs');
 const root = path.resolve(__dirname, '..');
-const store = new DeviceStore(path.join(root, '.userdata', 'browser-review', 'devices.json'));
+const store = new DeviceStore(path.join(process.argv[2] || path.join(root, '.userdata', 'browser-review'), 'devices.json'));
 const launcher = new EngineLauncher({ delay: 1200, workingDirectory: root, verify: async () => ({ ready: true, verified: true }), spawn: () => {
   const child = new EventEmitter(); child.unref = () => {};
   setImmediate(() => child.emit('spawn')); return child;
@@ -16,7 +16,7 @@ const snapshot = () => ({ devices: store.data.devices, engine: { ready: true, ve
   local: { name: 'Local test computer', addresses: ['127.0.0.1'], platform: 'win32' }, session: launcher.state, testMode: true });
 const bridge = [
   'let callback; const invoke=async(method,value)=>{const response=await fetch("/api/"+method,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(value??null)});return response.json()};',
-  'window.remoteControl={snapshot:()=>invoke("snapshot"),saveDevice:v=>invoke("save",v),removeDevice:v=>invoke("remove",v),chooseEngine:()=>invoke("snapshot"),prepare:v=>invoke("prepare",v),cancel:()=>invoke("cancel"),reset:v=>invoke("reset",v),documentation:()=>Promise.resolve({ok:true}),onSession:fn=>{callback=fn;}};',
+  'window.remoteControl={snapshot:()=>invoke("snapshot"),validateDevice:v=>invoke("validate",v),saveDevice:v=>invoke("save",v),removeDevice:v=>invoke("remove",v),chooseEngine:()=>invoke("snapshot"),prepare:v=>invoke("prepare",v),cancel:()=>invoke("cancel"),reset:v=>invoke("reset",v),documentation:()=>Promise.resolve({ok:true}),onSession:fn=>{callback=fn;}};',
   'let previous;setInterval(async()=>{const result=await invoke("snapshot");const state=JSON.stringify(result.value.session);if(previous!==state){previous=state;callback?.(result.value.session)}},100);'
 ].join('\n');
 const server = http.createServer(async (request, response) => {
@@ -28,6 +28,7 @@ const server = http.createServer(async (request, response) => {
       const value = JSON.parse(bytes); let result;
       switch (url.pathname) {
         case '/api/snapshot': result = snapshot(); break;
+        case '/api/validate': result = cleanDevice(value); break;
         case '/api/save': await store.put(value); result = snapshot(); break;
         case '/api/remove': await store.remove(value); result = snapshot(); break;
         case '/api/prepare': result = launcher.prepare(store.data.devices.find(d => d.id === value.id), value.action, value.consent, process.execPath); break;
@@ -43,7 +44,7 @@ const server = http.createServer(async (request, response) => {
     let content = await fs.readFile(path.join(root, 'src', allowed[url.pathname]), 'utf8');
     if (allowed[url.pathname] === 'index.html') content = content.replace('<script src="app.js">', '<script src="test-bridge.js"></script><script src="app.js">');
     response.setHeader('Content-Type', url.pathname.endsWith('.js') ? 'application/javascript' : url.pathname.endsWith('.css') ? 'text/css' : 'text/html'); response.end(content);
-  } catch (error) { response.setHeader('Content-Type', 'application/json'); response.end(JSON.stringify({ ok: false, error: error.message })); }
+  } catch (error) { response.setHeader('Content-Type', 'application/json'); response.end(JSON.stringify({ ok: false, code: error.code, error: error.message })); }
 });
 store.load().then(() => server.listen(0, '127.0.0.1', () => console.log('Browser review fixture: http://127.0.0.1:' + server.address().port)));
 process.on('SIGINT', () => { launcher.dispose(); server.close(); });

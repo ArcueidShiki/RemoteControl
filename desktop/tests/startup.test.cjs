@@ -23,6 +23,7 @@ test('losing instance quits before any store access, IPC or window startup', () 
       if (name === 'electron') return { app, BrowserWindow: forbidden, ipcMain: { handle: forbidden }, protocol: { registerSchemesAsPrivileged: forbidden } };
       if (name === './core.cjs') return { DeviceStore: forbidden, EngineLauncher: forbidden };
       if (name === './engine.cjs') return { verifyEngine: forbidden };
+      if (name === './network.cjs') return { describeInterfaces: forbidden };
       if (name === 'node:fs/promises') return { readFile: forbidden, writeFile: forbidden, mkdir: forbidden };
       return require(name);
     }

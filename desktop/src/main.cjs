@@ -4,8 +4,9 @@ const path = require('node:path');
 const os = require('node:os');
 const fs = require('node:fs/promises');
 const { pathToFileURL } = require('node:url');
-const { DeviceStore, EngineLauncher } = require('./core.cjs');
+const { DeviceStore, EngineLauncher, cleanDevice } = require('./core.cjs');
 const { verifyEngine } = require('./engine.cjs');
+const { describeInterfaces } = require('./network.cjs');
 
 const testing = process.env.REMOTECONTROL_TEST === '1' && !app.isPackaged;
 if (process.env.REMOTECONTROL_PROFILE) app.setPath('userData', path.resolve(process.env.REMOTECONTROL_PROFILE));
@@ -29,7 +30,7 @@ async function engineStatus() {
   return verifyEngine(store.data.enginePath);
 }
 async function snapshot() {
-  return { devices: store.data.devices, engine: await engineStatus(), local: { name: os.hostname(), platform: process.platform, addresses: localAddresses() },
+  return { devices: store.data.devices, engine: await engineStatus(), local: { name: os.hostname(), platform: process.platform, addresses: localAddresses(), interfaces: describeInterfaces(os.networkInterfaces()) },
     session: launcher.state, loadError: store.loadError || '', testMode: testing };
 }
 function handler(channel, fn) {
@@ -37,7 +38,7 @@ function handler(channel, fn) {
     if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== 'workspace://app/index.html')
       throw new Error('Untrusted request.');
     try { return { ok: true, value: await fn(...args) }; }
-    catch (error) { return { ok: false, error: error.message || 'The action could not be completed.' }; }
+    catch (error) { return { ok: false, code: error.code, error: error.message || 'The action could not be completed.' }; }
   });
 }
 async function openWorkspace() {
@@ -71,7 +72,11 @@ async function openWorkspace() {
   window.webContents.on('will-navigate', event => event.preventDefault());
   launcher.on('state', state => { if (window && !window.isDestroyed()) window.webContents.send('workspace:session', state); });
   handler('workspace:snapshot', snapshot);
-  handler('workspace:save-device', async value => { await store.put(value); return snapshot(); });
+  handler('workspace:validate-device', value => cleanDevice(value));
+  handler('workspace:save-device', async value => {
+    if (launcher.state.phase === 'preparing' || launcher.state.phase === 'handed-off') throw new Error('Finish the current handoff first.');
+    await store.put(value); return snapshot();
+  });
   handler('workspace:remove-device', async id => { if (launcher.state.phase === 'preparing' || launcher.state.phase === 'handed-off') throw new Error('Finish the current handoff first.'); await store.remove(String(id)); return snapshot(); });
   handler('workspace:choose-engine', async () => {
     if (launcher.state.phase === 'preparing' || launcher.state.phase === 'handed-off') throw new Error('Finish the current handoff first.');
@@ -79,7 +84,7 @@ async function openWorkspace() {
     if (result.canceled) return snapshot();
     let executable = result.filePaths[0];
     if (process.platform === 'darwin' && executable.endsWith('.app')) executable = path.join(executable, 'Contents', 'MacOS', 'RustDesk');
-    store.data.enginePath = executable; await store.save(); return snapshot();
+    await store.setEnginePath(executable); return snapshot();
   });
   handler('workspace:prepare', async value => {
     const device = store.data.devices.find(d => d.id === value?.id);

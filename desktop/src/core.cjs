@@ -12,7 +12,7 @@ function cleanDevice(value) {
   const peerId = String(value.peerId || '').replace(/\s/g, '');
   const peerIp = String(value.peerIp || '').trim();
   if (!name || name.length > 60) throw new Error('Use a computer name between 1 and 60 characters.');
-  if (!/^\d{6,12}$/.test(peerId)) throw new Error('Enter a RustDesk ID with 6–12 digits. Direct IP connections are not supported by this adapter.');
+  if (!/^\d{6,12}$/.test(peerId)) throw Object.assign(new Error('Enter a RustDesk ID with 6–12 digits. Direct IP connections are not supported by this adapter.'), { code: 'INVALID_PEER_ID' });
   if (peerIp && !isIP(peerIp)) throw new Error('Peer IP must be a valid IPv4 or IPv6 address, or left blank.');
   return { id: peerId, name, peerId, peerIp };
 }
@@ -22,37 +22,63 @@ function launchArguments(device, action) {
   return [action === 'files' ? '--file-transfer' : '--connect', checked.peerId];
 }
 class DeviceStore {
-  constructor(file) { this.file = file; this.data = { devices: [], enginePath: '' }; this.write = Promise.resolve(); }
+  #data;
+  constructor(file) { this.file = file; this.#commit({ devices: [], enginePath: '' }); this.write = Promise.resolve(); }
+  get data() { return this.#data; }
+  #commit(value) {
+    this.#data = Object.freeze({ devices: Object.freeze(value.devices.map(device => Object.freeze({ ...device }))), enginePath: value.enginePath });
+  }
   async load() {
+    await this.write.catch(() => {});
     try {
       const value = JSON.parse(await fs.readFile(this.file, 'utf8'));
-      this.data.devices = Array.isArray(value.devices) ? value.devices.map(cleanDevice).slice(0, 50) : [];
-      this.data.enginePath = typeof value.enginePath === 'string' ? value.enginePath : '';
+      this.#commit({ devices: Array.isArray(value.devices) ? value.devices.map(cleanDevice).slice(0, 50) : [],
+        enginePath: typeof value.enginePath === 'string' ? value.enginePath : '' });
+      delete this.loadError;
     } catch (error) { if (error.code !== 'ENOENT') this.loadError = 'Saved settings could not be read. No connection was started.'; }
     return this.data;
   }
-  async save() {
+  async #change(update) {
     if (this.loadError) throw new Error('Saved settings are unreadable. Back up and repair devices.json before saving.');
-    const snapshot = JSON.stringify(this.data, null, 2);
     this.write = this.write.catch(() => {}).then(async () => {
-      await fs.mkdir(path.dirname(this.file), { recursive: true });
+      // Derive the candidate only when this transaction owns the queue. A failed
+      // predecessor never contributes tentative state to a later save.
+      const candidate = update(this.data);
       const temporary = this.file + '.tmp';
-      await fs.writeFile(temporary, snapshot, { mode: 0o600 });
-      await fs.rename(temporary, this.file);
+      try {
+        await fs.mkdir(path.dirname(this.file), { recursive: true });
+        await fs.writeFile(temporary, JSON.stringify(candidate, null, 2), { mode: 0o600 });
+        await fs.rename(temporary, this.file);
+      } catch (cause) {
+        // Remove a partial candidate file, never recursively delete a directory.
+        await fs.unlink(temporary).catch(() => {});
+        throw Object.assign(new Error('Settings could not be saved. Existing settings were not changed. Retry after checking storage access.'),
+          { code: 'SETTINGS_SAVE_FAILED', cause });
+      }
+      this.#commit(candidate);
+      return this.data;
     });
     return this.write;
   }
+  async save() { return this.#change(data => data); }
+  async setEnginePath(enginePath) {
+    if (typeof enginePath !== 'string') throw new Error('Engine path must be a string.');
+    return this.#change(data => ({ ...data, enginePath }));
+  }
   async put(value) {
     const device = cleanDevice(value);
-    const existing = this.data.devices.findIndex(d => d.id === device.id);
-    if (existing >= 0) this.data.devices[existing] = device;
-    else {
-      if (this.data.devices.length >= 50) throw new Error('Up to 50 computers can be saved.');
-      this.data.devices.push(device);
-    }
-    await this.save(); return device;
+    await this.#change(data => {
+      const devices = [...data.devices], existing = devices.findIndex(d => d.id === device.id);
+      if (existing >= 0) devices[existing] = device;
+      else {
+        if (devices.length >= 50) throw new Error('Up to 50 computers can be saved.');
+        devices.push(device);
+      }
+      return { ...data, devices };
+    });
+    return device;
   }
-  async remove(id) { this.data.devices = this.data.devices.filter(d => d.id !== id); await this.save(); }
+  async remove(id) { return this.#change(data => ({ ...data, devices: data.devices.filter(d => d.id !== id) })); }
 }
 class EngineLauncher extends EventEmitter {
   constructor(options = {}) {
