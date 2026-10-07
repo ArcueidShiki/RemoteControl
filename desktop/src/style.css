@@ -81,3 +81,6 @@ video{height:100%;width:100%;object-fit:contain}#lab-placeholder{position:absolu
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 header{height:64px}.page{padding-top:24px}.page-heading{margin-bottom:18px}.preview-notice{margin-bottom:18px}
 .session-facts{margin:12px 0;padding:8px 0}.session-facts>div{margin:6px 0}.session-panel>p{font-size:11px}.session-panel .footnote{margin-top:12px}
+.wizard[open]{display:flex;flex-direction:column;overflow:hidden}
+.wizard>.dialog-heading,.wizard>.wizard-steps,.wizard>.wizard-footer,.wizard>#wizard-error{flex-shrink:0}
+.wizard>section{min-height:0;overflow-y:auto;flex:1 1 auto;padding-right:4px}

@@ -7,6 +7,9 @@ module.exports = async function wizardFlow(page, evidence, check) {
   await page.locator('#wizard-next').click();
   check((await page.locator('.network-status').textContent()).includes('未知'), 'network readiness and session encryption remain unknown');
   await page.locator('#wizard-refresh').click();
+  const nextButton = await page.locator('#wizard-next').boundingBox();
+  check(nextButton && nextButton.y >= 0 && nextButton.y + nextButton.height <= await page.evaluate(() => innerHeight),
+    'wizard navigation stays visible with native display scaling and a long network step');
   await page.screenshot({ path: path.join(evidence, 'wizard-02-network.png') });
   await page.locator('#wizard-next').click();
   await page.locator('#wizard-name').fill('暂存但取消');

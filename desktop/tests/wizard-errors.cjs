@@ -15,6 +15,8 @@ let browser;
   await page.evaluate(async () => { const s = await window.remoteControl.snapshot(); if (!s.value.testMode) throw new Error('Not a fixture'); for (const d of s.value.devices) await window.remoteControl.removeDevice(d.id); });
   await page.reload();
   await page.locator('#wizard-next').click();
+  const next = await page.locator('#wizard-next').boundingBox();
+  assert.ok(next && next.y + next.height <= 690, 'Wizard footer must remain visible without scrolling.');
   const fail = route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: false, error: '模拟失败：请重试' }) });
   await page.route('**/api/snapshot', fail);
   await page.locator('#wizard-refresh').click();
