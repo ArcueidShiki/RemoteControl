@@ -92,5 +92,6 @@ test('a real child receives the deliberate cwd and no parent secret or Node load
   }
   let output = ''; child.stdout.on('data', value => { output += value; });
   const [code] = await once(child, 'close'); assert.equal(code, 0);
-  assert.deepEqual(JSON.parse(output), { cwd: directory, secret: null, node: null });
+  // macOS exposes /var via /private/var; the child reports the physical cwd.
+  assert.deepEqual(JSON.parse(output), { cwd: await fs.realpath(directory), secret: null, node: null });
 }));
