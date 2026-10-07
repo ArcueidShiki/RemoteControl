@@ -292,4 +292,3 @@ $('lab-start').addEventListener('click', () => action(async () => {
   }
 }));
 window.addEventListener('beforeunload', stopLab);
-
