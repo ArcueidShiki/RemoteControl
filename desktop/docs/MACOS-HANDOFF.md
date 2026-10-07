@@ -29,10 +29,28 @@ node scripts/build-macos.cjs FULL_40_CHARACTER_COMMIT_SHA arm64
 
 The script requires macOS, a matching native architecture, the specified HEAD,
 a clean repository and installed direct dependencies matching package.json.
-It runs the Node tests, invokes the existing packager, checks bundle ID/version,
-Mach-O architecture, ASAR/source byte equality and exclusion of development
-directories, then creates a ZIP with ditto and checks its integrity.
-It includes the app, repository license, README and Mac/preview boundaries.
+Git status alone is not the packaging boundary: ignored files can exist in a
+clean checkout. The script reads only explicit regular-file Git blobs from the
+selected commit into a fresh temporary staging directory. It never copies the
+developer checkout or its node_modules into the application. App files and
+distribution documents have separate allowlists in scripts/macos-stage.cjs.
+The runtime package.json is deterministically reduced to name, version,
+description and main. Source file bytes otherwise come directly from Git.
+
+The current app has no npm production dependencies. Its lockfile must agree
+with package.json and contain no production package entries. Adding a runtime
+dependency fails closed until a reviewed production-dependency allowlist and
+clean locked install are implemented; dependencies are never silently dropped.
+Electron remains the pinned external runtime and its notices are retained.
+
+After the Node tests, Packager receives only the clean stage and a new output
+directory. The build checks bundle ID/version, Mach-O architecture and the
+complete ASAR inventory (every path/type/content hash/executable flag). It then
+creates a ZIP without resource forks or extended attributes, checks every ZIP
+entry, extracts it and compares every file hash, directory, executable flag and
+symlink target against the clean package. Links escaping the bundle root fail.
+Only successful results replace the generated app directory under dist.
+The legacy package:mac shortcut now refuses the broad-copy path.
 Do not treat this as bit-for-bit reproducibility: filesystem timestamps,
 toolchain and generated metadata may differ between runs.
 
@@ -43,9 +61,10 @@ Outputs under `desktop/dist/`:
 - The matching `.json` build manifest and `.zip.sha256` checksum
 
 The manifest records the source HEAD, Node/macOS/Electron versions, lockfile
-hash, declared minimum OS, signing inspection, checks and unvalidated scope.
-The existing packager replaces only its generated architecture directory;
-the wrapper replaces an existing ZIP for the same revision.
+hash, complete ASAR/package inventories, declared minimum OS, signing inspection,
+checks and unvalidated scope. The wrapper replaces an existing ZIP for the same
+revision. Old pre-fix preview archives are superseded and are not release inputs;
+the ignored-file review finding was a packaging risk, not evidence of a leak.
 For Intel, run on an authorized Intel Mac with `x64`. Cross-architecture and
 universal builds are not claimed tested. No DMG/PKG or final installer is
 produced by this milestone; wait for the agreed UI/architecture HEAD first.
@@ -59,7 +78,13 @@ runtime assets. No RustDesk executable is downloaded or bundled by this build.
 
 ## Verification and current limits
 
-On this Mac, all 14 Node tests passed after the physical-path fix. A native
+On this Mac, the original 14 Node tests passed after the physical-path fix.
+The security revision adds four regression tests using only synthetic fixture
+repositories: ignored .pfx canaries, ignored node_modules/output, untracked
+build/source files, modified worktree source/docs, extra/altered/linked ASAR
+entries, production-dependency rejection, duplicate ZIP entries and escaping
+bundle links. The Mac fixture also creates and extracts a real ZIP.
+A native
 arm64 app and roughly 129 MB preview ZIP were built successfully, with declared
 minimum macOS 13.0. Bundle metadata, architecture, ASAR/source equality and ZIP
 integrity passed. `codesign -d` reports ad-hoc/linker signing, no TeamIdentifier,
@@ -72,7 +97,7 @@ reported â€œcode has no resources but signature indicates they must be presentâ€
 `spctl --assess` returned an internal Code Signing subsystem error in this
 execution environment. This does not establish a single root cause or a
 Gatekeeper verdict. No successful native UI test is claimed, and no quarantine,
-signing, sandbox or Gatekeeper workaround was applied. Resolve through a normal
+manual re-signing, sandbox or Gatekeeper workaround was applied. Resolve through a normal
 verified runtime/signing path before attempting production GUI acceptance.
 
 `npm test` checks validation, consent/cancellation, saved-path and content-digest
@@ -90,12 +115,22 @@ EXE. Do not claim them passed on Mac; adapt these with the shared UI owner once
 the common HEAD is agreed. The build manifest intentionally claims only static
 bundle checks and Node tests, not production GUI/session validation.
 
-No Developer ID signing or notarization is configured. Upstream/ad-hoc code
-signatures can remain inside the bundle; these do not establish this app's
-publisher identity or Gatekeeper approval. Do not remove quarantine, disable
-Gatekeeper, bypass warnings, ad-hoc re-sign as a workaround, or silently install.
+No Developer ID signing or notarization is configured. Packager 20.3.0 normally
+patches the Electron framework integrity digest and automatically ad-hoc signs
+that framework. These operations and upstream/ad-hoc signatures do not establish
+this app's publisher identity or Gatekeeper approval. No manual re-signing was
+used to force a failed launch. Do not remove quarantine, disable Gatekeeper,
+bypass warnings, ad-hoc re-sign as a workaround, or silently install.
 A distributable installer needs the approved signing/notarization path and
 an independent review of the final revision.
+
+The build checks that Electron's LICENSE and LICENSES.chromium.html plus the
+repository's PROJECT-LICENSE.txt exist and are nonempty; all are included in
+the verified ZIP inventory. SOURCE-REFERENCE.json identifies the exact public
+repository commit, relevant build scripts/lockfile/test hashes and the matching
+Electron source tag. This records available source/build references and notices;
+it is not a complete dependency-license compliance audit, nor approval for
+integrating or relicensing any engine.
 
 ## Mac engine acceptance gate
 

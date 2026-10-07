@@ -5,7 +5,7 @@ const fs = require('node:fs/promises');
   const { packager } = await import('@electron/packager');
   const platform = process.argv[2], arch = process.argv[3];
   if (!['win32', 'darwin'].includes(platform) || !['x64', 'arm64'].includes(arch)) throw new Error('Choose win32/darwin and x64/arm64.');
-  if (platform === 'darwin' && process.platform !== 'darwin') throw new Error('Build and validate the Mac package on an authorized Mac.');
+  if (platform === 'darwin') throw new Error('Use node scripts/build-macos.cjs FULL_40_CHARACTER_HEAD ' + arch + ' for allowlisted Mac packaging.');
   const root = path.resolve(__dirname, '..');
   const outputs = await packager({ dir: root, out: path.join(root, 'dist'), name: 'RemoteControl', platform, arch,
     electronVersion: require('../package.json').devDependencies.electron, electronZipDir: process.env.ELECTRON_ZIP_DIR || undefined, overwrite: true, asar: true,

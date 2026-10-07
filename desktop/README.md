@@ -30,10 +30,10 @@ RustDesk is not bundled or silently installed. Obtain the reviewed asset separat
 
 ## Build and package
 - Windows x64: npm run package:win
-- On an authorized Apple Silicon Mac: npm ci; npm test; npm run test:ui; npm run package:mac
-- Intel Mac, if needed: node scripts/package.cjs darwin x64
+- On an authorized Apple Silicon Mac: npm ci; node scripts/build-macos.cjs FULL_40_CHARACTER_HEAD arm64
+- Intel Mac, if needed: run the same command with x64 on an authorized Intel Mac.
 
-The packager refuses a Mac build on Windows. Signing/notarization are not configured. The shared Mac UI is source only; actual engine launch is blocked until the Mac release executable identity is reviewed and added to the verifier. Do not claim a tested Mac package until these commands and real UI/permission/session tests pass on the owner's authorized Mac.
+Mac packaging requires an explicit revision and uses a clean Git-blob allowlist; the old package:mac shortcut refuses the broad-copy path. See docs/MACOS-HANDOFF.md for native build evidence and remaining GUI blockers. Developer ID signing/notarization are not configured; Packager performs automatic ad-hoc framework signing. Actual Mac engine launch is blocked until the release bundle identity is reviewed and added to the verifier. A built archive does not establish real UI/permission/session acceptance.
 
 ELECTRON_ZIP_DIR may point to a directory containing the pinned official Electron ZIP to avoid another download. The source lockfile pins dependencies. REMOTECONTROL_PROFILE sets a separate local profile for testing. REMOTECONTROL_TEST only works in unpackaged development; it substitutes the engine launcher, never the WebRTC lab. Tests run an invisible Electron window and never control shared desktop windows.
 
