@@ -2,9 +2,9 @@
 
 Decision: Electron shared UI and Node session/device models, with an external, unmodified RustDesk application as the remote-desktop engine.
 
-Why: the repository is Windows/MFC only; Rust/Cargo and a cross-platform native UI toolchain are not installed here. Node is available, Electron supplies one Windows/macOS interface, and RustDesk already maintains desktop media/input/file-transfer and cross-network behavior. This avoids inventing a remote-control security protocol in a UI rewrite. Electron carries a larger runtime/memory footprint; no “lightest” or “fastest” claim is made.
+The previous implementation was Windows/MFC only. Electron now supplies the shared interface; the current adapter delegates media/input/file-transfer to a separately obtained RustDesk application. It does not introduce a replacement remote-control security protocol. Electron carries a larger runtime/memory footprint; no “lightest” or “fastest” claim is made.
 
-This first milestone is an explicit separate-process integration. It is not an embedded engine, not a reimplementation of RustDesk, and not the completed professional remote-desktop target. The old MFC work is preserved on separate local commits 98f73e2 and 3df6d57; this PR starts from the original main branch and adds the new desktop tree only.
+This remains an explicit separate-process integration, not an embedded engine or the completed remote-desktop target. Retired MFC source/projects/UML have been removed from the active tree; history and original branches remain. See [legacy risks and commits](LEGACY-AUDIT.md). Build, debugging and test instructions are in the [Chinese guide](../../BUILD.md).
 
 ## Security boundaries
 

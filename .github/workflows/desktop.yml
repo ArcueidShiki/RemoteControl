@@ -1,10 +1,10 @@
 name: Desktop milestone checks
 on:
   pull_request:
-    paths: ['desktop/**', '.github/workflows/desktop.yml']
+    paths: ['desktop/**', 'README.md', 'BUILD.md', '.gitignore', '.github/workflows/desktop.yml']
   push:
-    branches: ['codex/cross-platform-milestone', 'codex/connection-wizard-installer']
-    paths: ['desktop/**', '.github/workflows/desktop.yml']
+    branches: ['codex/cross-platform-milestone', 'codex/connection-wizard-installer', 'codex/desktop-cleanup-guide']
+    paths: ['desktop/**', 'README.md', 'BUILD.md', '.gitignore', '.github/workflows/desktop.yml']
 permissions:
   contents: read
 jobs:
