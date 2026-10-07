@@ -2,6 +2,12 @@
 
 ## Scope and baseline
 
+This document preserves the historical Mac build evidence and current Mac safety
+gates. The active build/debug/test instructions are in [BUILD.md](../../BUILD.md).
+The later cleanup removes retired MFC projects, not this handoff or the shared
+macos-stage.cjs module used by both platforms. Historical Mac results below do
+not establish native acceptance of the current shared HEAD.
+
 The authorized Mac was inspected on 2026-10-07: Apple Silicon arm64,
 macOS 26.4.1, Node 23.11.0 / npm 10.9.2, pnpm 10.15.0, Rust 1.90.0,
 Xcode 27.0 beta (27A5228h), macOS SDK 27.0. No existing RemoteControl or
