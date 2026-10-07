@@ -1,4 +1,9 @@
-# RemoteControl desktop — milestone 0.2
+# RemoteControl desktop - milestone 0.3 preview
+
+The Chinese home screen includes a four-step first-use connection wizard. It saves
+a device only after review and never launches automatically. Actual session
+encryption, Tailscale routing and reachability remain explicitly unknown. The
+local lab is under advanced settings. See [wizard/installer scope and validation](docs/WIZARD-INSTALLER.md).
 
 A shared Windows/macOS workspace with an external RustDesk engine. This replaces the MFC application as the active direction; it does not wrap or launch the legacy server.
 
@@ -29,7 +34,7 @@ RustDesk is not bundled or silently installed. Obtain the reviewed asset separat
 - The local WebRTC lab uses a generated canvas and two peers on this machine with no ICE servers. It measures actual decoded dimensions/FPS and data-channel echo. It does not capture the screen or control the OS, and its results are not RustDesk/WAN/input-to-display benchmarks.
 
 ## Build and package
-- Windows x64: npm run package:win
+- Windows x64, from a clean committed checkout: npm run package:win -- $(git rev-parse HEAD)
 - On an authorized Apple Silicon Mac: npm ci; node scripts/build-macos.cjs FULL_40_CHARACTER_HEAD arm64
 - Intel Mac, if needed: run the same command with x64 on an authorized Intel Mac.
 
