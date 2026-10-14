@@ -1,23 +1,36 @@
 # RemoteControl
 
-The active client is now the cross-platform application in [desktop](desktop/README.md). The original MFC client/server source remains in RemoteCtrl for historical reference; it is not used by the new application.
+当前可维护的应用位于 `desktop/`：Electron 桌面界面、设备列表、首次连接向导，以及独立 RustDesk 窗口的启动入口。旧 MFC 客户端、旧服务器、Visual Studio 工程和 UML 已从当前源码移除；Git 历史与已有分支保留。
 
-## Current milestone
-- Shared Windows/macOS interface with saved computers, local addresses and explicit connection consent.
-- External RustDesk desktop/file-transfer handoff. RustDesk is obtained separately and owns authentication, encrypted sessions, host permissions, mouse/keyboard, media and disconnect.
-- A local synthetic WebRTC lab reports actual decoded resolution/FPS and data-channel echo. It is not a production remote-desktop benchmark.
-- Windows package build support; Mac source/build handoff, with actual Mac testing still required.
-- Engine launch accepts only the reviewed Windows release digest; changed/unverified files and Mac engine launch are blocked pending identity review.
+**从 [中文构建、Debug、测试与安装包指南](BUILD.md) 开始。** 新版不使用旧 `.sln/.vcxproj`，也不通过 Visual Studio 的 Publish 生成安装包。
 
-See [the architecture and limitations](desktop/docs/CURRENT-ARCHITECTURE.md), [Mac handoff](desktop/docs/MACOS-HANDOFF.md) and [legacy code audit](desktop/docs/LEGACY-AUDIT.md).
+## 快速开始
 
-## Development
-From desktop, run npm ci, npm test and npm start using Node 22.12 or newer. Windows installers require a clean committed checkout and an explicit HEAD: npm run package:win -- $(git rev-parse HEAD). Follow desktop/README.md for platform packaging and [the new connection wizard](desktop/docs/WIZARD-INSTALLER.md).
+准备 Git 和 Node.js 22.12+（CI 使用 Node 22），在仓库根目录运行：
 
-## Security
-The original server has no authentication or transport encryption and must not be exposed publicly. The new client never falls back to it. Do not weaken Windows account, password, firewall or UAC policies to use this project. No VPN setup or node enrollment is performed by this milestone.
+```powershell
+cd desktop
+npm ci
+npm test
+npm start
+```
 
-## Review workflow
-Use a task branch, run the relevant tests, open a draft PR, complete independent review and required checks, then merge through the repository's normal protections. Do not force-push another person's work.
+这会打开新版工作区。保存设备不会自动连接；实际会话仍在用户另行取得的、通过校验的 RustDesk 中完成。
 
-The repository license is unchanged. RustDesk is independently licensed and is not bundled or linked into the new client.
+## 项目结构
+
+| 路径 | 用途 |
+| --- | --- |
+| [BUILD.md](BUILD.md) | Windows/macOS 构建条件、主进程与界面调试、测试范围、setup 产物及排错 |
+| [desktop/src](desktop/src) | 当前应用与引擎身份、权限和设置存储边界 |
+| [desktop/tests](desktop/tests) | 单元、原生 UI、打包、安全、安装器与测试辅助程序 |
+| [desktop/scripts](desktop/scripts) | 从固定 Git 提交构建；Windows/Mac 共享白名单和清单校验 |
+| [架构说明](desktop/docs/CURRENT-ARCHITECTURE.md) | 当前能力与安全边界 |
+| [验证记录](desktop/docs/VALIDATION.md) | 有版本依据的结果及未完成验收 |
+| [旧服务风险与历史](desktop/docs/LEGACY-AUDIT.md) | 删除原因、历史提交与只读查看方式 |
+
+本仓库许可证 [LICENSE](LICENSE) 保持不变。Electron/Chromium 及项目 notices 随包保留。RustDesk 未捆绑，其独立许可与未来整合方式需要单独审查。
+
+当前应用不能确认外部会话的鉴权、加密、直连/中继状态或实际断开；不能宣称已完成双机安全与性能验收。Mac 引擎仍被校验门禁阻止。没有旧服务器回退，也不会自动安装引擎、修改 VPN、防火墙、开机启动或主机权限。
+
+开发变更先在独立分支验证，再通过草稿 PR 审查。清理历史源码不等于授权合并既有 PR、发布或部署。

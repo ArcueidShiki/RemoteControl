@@ -1,5 +1,9 @@
 # Connection wizard and Windows installer preview
 
+For the current Chinese build, debug, test and setup instructions, see
+[BUILD.md](../../BUILD.md). The cleanup preserves this UI/installer implementation
+and all security tests; historical MFC projects are no longer in the active tree.
+
 This milestone is stacked on the reviewed Mac packaging HEAD
 `19e056edb66c46f10045a00ce77bab0b722949b3`. It does not merge PR 67 or 68.
 
