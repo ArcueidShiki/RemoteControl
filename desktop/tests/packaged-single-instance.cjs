@@ -23,7 +23,8 @@ async function open(profile) {
   application = await electron.launch({ executablePath: executable, args: [],
     env: { ...process.env, REMOTECONTROL_PROFILE: profile }, timeout: 30000 });
   const page = await application.firstWindow();
-  await page.waitForFunction(() => document.getElementById('engine-summary').textContent.includes('Unverified'));
+  await page.waitForFunction(() => document.getElementById('engine-summary').textContent.includes('未通过校验'));
+  if (await page.locator('#setup-dialog').evaluate(el => el.open)) await page.locator('#wizard-close').click();
   assert.equal(await application.evaluate(({ app }) => app.isPackaged && app.hasSingleInstanceLock()), true);
   return page;
 }

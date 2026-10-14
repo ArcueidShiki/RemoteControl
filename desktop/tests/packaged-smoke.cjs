@@ -13,10 +13,10 @@ let application;
   await fs.writeFile(impostor, 'This is a test fixture, not an executable.');
   await fs.writeFile(path.join(profile, 'devices.json'), JSON.stringify({ devices: [{ name: 'Fixture - no remote session', peerId: '123456789' }], enginePath: impostor }));
   // Deliberately set the development mock flag: packaged builds MUST ignore it.
-  application = await electron.launch({ executablePath: path.join(root, 'dist', 'RemoteControl-win32-x64', 'RemoteControl.exe'),
+  application = await electron.launch({ executablePath: process.env.REMOTECONTROL_PACKAGED_EXE || path.join(root, 'dist', 'RemoteControl-win32-x64', 'RemoteControl.exe'),
     args: [], env: { ...process.env, REMOTECONTROL_PROFILE: profile, REMOTECONTROL_TEST: '1' }, timeout: 30000 });
   const page = await application.firstWindow(); const errors = []; page.on('pageerror', error => errors.push(error.message));
-  await page.waitForFunction(() => document.getElementById('engine-summary').textContent.includes('Unverified'));
+  await page.waitForFunction(() => document.getElementById('engine-summary').textContent.includes('未通过校验'));
   assert.equal(await application.evaluate(({ app }) => app.isPackaged), true);
   const preferences = await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences());
   assert.equal(preferences.sandbox, true); assert.equal(preferences.contextIsolation, true); assert.equal(preferences.nodeIntegration, false);
@@ -24,13 +24,13 @@ let application;
   const snapshot = await page.evaluate(() => window.remoteControl.snapshot());
   assert.equal(snapshot.ok, true); assert.equal(snapshot.value.testMode, false);
   assert.equal(snapshot.value.engine.ready, false); assert.equal(snapshot.value.engine.verified, false);
-  await page.getByRole('button', { name: 'Select Fixture - no remote session', exact: true }).click();
+  await page.getByRole('button', { name: '选择 Fixture - no remote session', exact: true }).click();
   await page.locator('#consent').check(); assert.equal(await page.locator('#connect').isDisabled(), true);
   // Renderer manipulation/direct IPC also cannot bypass launch-time checking.
   await page.evaluate(() => window.remoteControl.prepare({ id: '123456789', action: 'desktop', consent: true }));
   await page.waitForFunction(() => document.getElementById('session-description').textContent.includes('Unverified'));
   assert.equal((await page.evaluate(() => window.remoteControl.snapshot())).value.session.phase, 'error');
-  await page.locator('[data-page="settings"]').click();
+  await page.locator('.nav[data-page="settings"]').click();
   assert.match(await page.locator('#engine-verification').textContent(), /Unverified/);
   await page.screenshot({ path: path.join(evidence, 'packaged-unverified-engine.png') });
   assert.deepEqual(errors, []);
