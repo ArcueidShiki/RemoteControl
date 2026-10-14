@@ -22,7 +22,7 @@ test('saved paths and renamed executables do not establish engine trust', () => 
   const executable = path.join(directory, 'rustdesk.exe');
   await fs.copyFile(process.execPath, executable);
   const store = new DeviceStore(path.join(directory, 'devices.json'));
-  store.data.enginePath = executable; await store.save();
+  await store.setEnginePath(executable);
   const restored = new DeviceStore(store.file); await restored.load();
   assert.equal(restored.data.enginePath, executable);
   assert.equal((await verifyEngine(restored.data.enginePath, { platform: 'win32', arch: 'x64' })).verified, false);
@@ -92,6 +92,9 @@ test('a real child receives the deliberate cwd and no parent secret or Node load
   }
   let output = ''; child.stdout.on('data', value => { output += value; });
   const [code] = await once(child, 'close'); assert.equal(code, 0);
-  // macOS exposes /var via /private/var; the child reports the physical cwd.
-  assert.deepEqual(JSON.parse(output), { cwd: await fs.realpath(directory), secret: null, node: null });
+  // Canonicalize both sides: macOS may report /private/var and Windows may
+  // report an 8.3 short path. They must still resolve to the exact same folder.
+  const observed = JSON.parse(output);
+  observed.cwd = await fs.realpath(observed.cwd);
+  assert.deepEqual(observed, { cwd: await fs.realpath(directory), secret: null, node: null });
 }));

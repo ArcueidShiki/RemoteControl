@@ -25,7 +25,7 @@ async function waitForPhase(launcher, phase) {
   const profile = await fs.mkdtemp(path.join(root, '.userdata', 'trusted-engine-'));
   const executable = path.join(profile, 'rustdesk.exe'); await fs.copyFile(source, executable);
   const cwd = path.join(profile, 'engine-working-directory'); await fs.mkdir(cwd);
-  const store = new DeviceStore(path.join(profile, 'devices.json')); store.data.enginePath = executable; await store.save();
+  const store = new DeviceStore(path.join(profile, 'devices.json')); await store.setEnginePath(executable);
   const restored = new DeviceStore(store.file); await restored.load();
   assert.equal((await verifyEngine(restored.data.enginePath)).verified, true);
   console.log('PASS official release digest and restored saved path verified: ' + identity.sha256);

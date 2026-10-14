@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
@@ -7,40 +7,41 @@
 </head>
 <body>
 <aside class="sidebar">
-  <a class="brand" href="#" aria-label="RemoteControl home"><span class="brand-mark">↗</span><span>Remote<span class="brand-light">Control</span></span></a>
-  <div class="workspace-label">YOUR WORKSPACE</div>
-  <nav aria-label="Main navigation">
-    <button class="nav active" data-page="devices"><span>▦</span> Computers</button>
-    <button class="nav" data-page="lab"><span>◉</span> Connection lab</button>
-    <button class="nav" data-page="settings"><span>⚙</span> Settings</button>
+  <a class="brand" href="#" aria-label="RemoteControl 首页"><span class="brand-mark">R</span><span>Remote<span class="brand-light">Control</span></span></a>
+  <div class="workspace-label">你的工作空间</div>
+  <nav aria-label="主导航">
+    <button class="nav active" data-page="devices"><span aria-hidden="true">▣</span> 我的电脑</button>
+    <button class="nav" data-page="settings"><span aria-hidden="true">⚙</span> 设置与帮助</button>
   </nav>
-  <div class="sidebar-bottom"><span class="small-dot"></span> Local workspace<div>Windows + macOS</div><p>No background scanning.<br>No session recording.</p></div>
+  <div class="sidebar-bottom">连接预览版<div>Windows + macOS</div><p>设备由你添加。<br>每次连接由你确认。</p></div>
 </aside>
 <main>
-  <header><div class="breadcrumb">Workspace <span>/</span> <span id="page-name">Computers</span></div><span class="version">PREVIEW 0.2</span></header>
+  <header><div class="breadcrumb">工作空间 <span>/</span> <span id="page-name">我的电脑</span></div><span class="version">PREVIEW 0.3</span></header>
   <div id="alert" role="alert" hidden></div>
   <section id="devices-page" class="page">
-    <div class="page-heading"><div><div class="eyebrow">A LITTLE CLOSER</div><h1>Your computers.</h1><p>Pick a computer. Continue securely in RustDesk.</p></div><button class="primary" id="add-device">＋ Add computer</button></div>
-    <div class="setup-banner" id="setup-banner"><span class="setup-icon">↗</span><div><strong>Connect your remote desktop engine</strong><p>Choose the verified RustDesk release in Settings to open your computers.</p></div><button class="secondary" id="setup-engine">Set up RustDesk</button></div>
-    <div class="workspace-grid"><div><div class="section-heading"><h2>Saved computers <span id="device-count">0</span></h2><label class="search"><span>⌕</span><input id="search" placeholder="Find a computer" aria-label="Find a computer"></label></div>
+    <div class="page-heading"><div><div class="eyebrow">从这里，回到你的另一台电脑</div><h1>连接，简单一点。</h1><p>保存常用电脑，每次由你决定何时连接。</p></div><button class="secondary" id="start-guide">连接向导</button></div>
+    <div class="preview-notice"><strong>远程会话将在外部 RustDesk 窗口中打开</strong><p>本应用尚未集成远程画面；身份验证、访问授权和断开连接均在 RustDesk 中完成。</p></div>
+    <div class="setup-banner" id="setup-banner"><span class="setup-icon" aria-hidden="true">1</span><div><strong>还差一步：准备连接程序</strong><p>向导会带你检查程序、地址和权限，不会自动连接。</p></div><button class="secondary" id="setup-engine">开始设置</button></div>
+    <div class="workspace-grid"><div><div class="section-heading"><h2>已保存的电脑 <span id="device-count">0</span></h2><button class="text-button" id="add-device">＋ 快速添加</button></div>
+      <label class="search"><input id="search" placeholder="搜索名称或 ID" aria-label="搜索电脑"></label>
       <div id="device-list"></div>
-      <div id="empty-state"><div class="empty-monitor"><span></span></div><h3>A familiar computer, one click away.</h3><p>Add its RustDesk ID. Only computers you choose are saved.</p><button class="secondary" id="empty-add">Add your first computer</button></div>
-      <div class="local-card"><div class="mini-icon">▣</div><div><strong id="local-name">This computer</strong><p id="local-addresses">Reading local addresses…</p></div><span class="local-badge">LOCAL</span></div>
+      <div id="empty-state"><div class="empty-monitor"><span></span></div><h3>先添加你的第一台电脑。</h3><p>在另一台电脑上查看 RustDesk ID，再通过向导完成准备。</p><button class="primary" id="empty-add">开始连接向导</button></div>
+      <div class="local-card"><div class="mini-icon" aria-hidden="true">▣</div><div><strong id="local-name">这台电脑</strong><p id="local-addresses">正在读取本机地址…</p></div><span class="local-badge">本机</span></div>
     </div>
-    <aside class="session-panel"><div class="section-heading"><h2>Connection</h2><span id="session-badge" class="badge">Ready</span></div><div class="session-symbol">↗</div><h3 id="session-name">Choose a computer</h3><p id="session-description">Your remote desktop opens in RustDesk, where you confirm identity and permissions.</p>
-      <dl class="session-facts"><div><dt>Peer</dt><dd id="peer-id">—</dd></div><div><dt>Peer IP</dt><dd id="peer-ip">Not supplied</dd></div><div><dt>Engine</dt><dd id="engine-summary">Setup needed</dd></div></dl>
-      <div id="connection-actions"><label class="field-label" for="action">Open</label><select id="action"><option value="desktop">Remote desktop</option><option value="files">File transfer</option></select><label class="consent"><input type="checkbox" id="consent"><span>I have permission to connect to this computer.</span></label><button class="primary wide" id="connect" disabled>Continue in RustDesk <span>↗</span></button></div>
-      <div id="handoff-actions" hidden><button class="secondary wide" id="cancel-handoff">Cancel opening</button><button class="secondary wide" id="reset-handoff" hidden>I ended the session in RustDesk</button></div>
-      <p class="footnote">View-only, mouse, keyboard, display quality and disconnect are controlled in RustDesk. This workspace cannot observe or enforce them.</p>
+    <aside class="session-panel"><div class="section-heading"><h2>连接准备</h2><span id="session-badge" class="badge">未连接</span></div><h3 id="session-name">选择一台电脑</h3><p id="session-description" role="status" aria-live="polite">准备好后，在 RustDesk 中确认对方身份与权限。</p>
+      <dl class="session-facts"><div><dt>对端 ID</dt><dd id="peer-id">—</dd></div><div><dt>对端地址</dt><dd id="peer-ip">未填写</dd></div><div><dt>连接程序</dt><dd id="engine-summary">待设置</dd></div><div><dt>会话加密</dt><dd>未知 · 本应用无法核实</dd></div><div><dt>直连 / 中继</dt><dd>未知 · 未读取会话路径</dd></div></dl>
+      <div id="connection-actions"><label class="field-label" for="action">要做什么</label><select id="action"><option value="desktop">查看或控制桌面</option><option value="files">传输文件</option></select><label class="consent"><input type="checkbox" id="consent"><span>我已获得连接这台电脑的许可。</span></label><button class="primary wide" id="connect" disabled>在 RustDesk 中继续 ↗</button></div>
+      <div id="handoff-actions" hidden><button class="secondary wide" id="cancel-handoff">取消打开</button><button class="secondary wide" id="reset-handoff" hidden>我已在 RustDesk 中结束会话</button></div>
+      <p class="footnote">仅查看、键鼠和文件权限由 RustDesk 管理。关闭此窗口不会断开外部会话。</p>
     </aside></div>
   </section>
   <section id="settings-page" class="page" hidden>
-    <div class="page-heading"><div><div class="eyebrow">MAKE IT YOURS</div><h1>Keep the setup simple.</h1><p>One engine. Your own computers. Clear boundaries.</p></div></div>
-    <article class="settings-card"><div class="section-heading"><h2>Remote desktop engine</h2><span class="badge">External app</span></div><h3>RustDesk</h3><p>This preview verifies the RustDesk 1.5.0 Windows x64 executable against a reviewed SHA-256 digest. Other builds, including macOS, remain blocked until their release identity is reviewed. Authentication and host permissions remain in RustDesk.</p><p id="engine-verification" role="status"></p><code id="engine-path">No application selected</code><div class="button-row"><button class="primary" id="choose-engine">Choose RustDesk</button><button class="secondary" id="engine-docs">Setup guide ↗</button></div><p class="footnote">RustDesk is not bundled. Its existing server configuration is used unchanged. No password, VPN credentials or unattended-access setting is stored here.</p></article>
-    <div class="two-cards"><article class="settings-card"><h2>Permission comes first</h2><p>Ask the owner to approve access in RustDesk. Select view-only there before interacting. File transfer has its own host permission.</p><p>No direct-IP launch is provided: an IP address alone does not establish peer identity or encryption.</p></article><article class="settings-card"><h2>What stays local</h2><p>Computer names, RustDesk IDs, optional IP labels and the selected engine path are saved on this computer.</p><p>No passwords, clipboard contents, screen recordings or analytics are collected.</p></article></div>
-    <article class="settings-card"><h2>About this milestone</h2><p>The shared Windows/macOS UI replaces MFC. Remote sessions open in the external RustDesk window. The local lab measures a separate synthetic WebRTC path; it is not a RustDesk performance result.</p><p class="footnote">Repository license unchanged (GPL v2 file). RustDesk is independently licensed AGPL-3.0. No RustDesk source is copied or linked. Engine redistribution and deeper integration need a license review.</p></article>
+    <div class="page-heading"><div><div class="eyebrow">按需设置</div><h1>设置与帮助</h1><p>连接程序、权限说明，以及可选的本机诊断。</p></div></div>
+    <article class="settings-card"><div class="section-heading"><h2>连接程序</h2><span class="badge">外部应用</span></div><h3>RustDesk</h3><p>此预览版只允许已审查的 RustDesk 1.5.0 Windows x64 程序。选择时和每次打开前都会校验文件；其他版本和 macOS 引擎暂不可用。</p><p id="engine-verification" role="status"></p><code id="engine-path">尚未选择程序</code><div class="button-row"><button class="primary" id="choose-engine">选择已有 RustDesk</button><button class="secondary" id="engine-docs">官方设置文档 ↗</button></div><p class="footnote">RustDesk 未随本应用提供，也不会自动安装。沿用它已有的服务器配置；本应用不保存密码、VPN 凭据或无人值守设置。</p></article>
+    <div class="two-cards"><article class="settings-card"><h2>由对方确认访问</h2><p>请在对方设备上批准本次访问，按需选择仅查看或键鼠控制。文件传输需要单独获得许可。</p><p>Mac 被控端可能需要屏幕录制和辅助功能权限；必须由设备使用者在系统设置中确认。</p></article><article class="settings-card"><h2>地址不等于可信身份</h2><p>LAN 或 Tailscale 地址只是网络线索。是否直连、是否中继，以及会话身份和加密状态，都需在实际会话中核实。</p><p>已保存的对端 IP 仅供备注，不用于绕过 ID 验证。</p></article></div>
+    <details class="settings-card"><summary>高级：本机诊断与预览版说明</summary><p>本机实验发送合成画面，只用于观察本机 WebRTC 行为。结果不是远程桌面性能，也不是公网安全证明。</p><button class="secondary" data-page="lab">打开本机实验</button><p>本地保存设备名称、数字 ID、可选 IP 备注与程序路径。没有屏幕录制、剪贴板内容或分析数据采集。</p><p class="footnote">仓库许可保持原样（GPL v2 文件）。RustDesk 独立采用 AGPL-3.0；未复制、链接或打包其代码。引擎集成选型尚未完成。</p></details>
   </section>
-  <section id="lab-page" class="page" hidden>
+    <section id="lab-page" class="page" hidden>
     <div class="page-heading"><div><div class="eyebrow">MEASURE, DON'T GUESS</div><h1>Connection lab.</h1><p>Real WebRTC. Synthetic pixels. Only this computer.</p></div><span class="badge">Local test</span></div>
     <div class="lab-toolbar"><label>Source resolution<select id="lab-resolution"><option value="1080">1920 × 1080 · Full HD</option><option value="1440">2560 × 1440 · QHD</option><option value="2160">3840 × 2160 · 4K UHD</option></select></label><button class="primary" id="lab-start">Start local test</button><button class="secondary" id="lab-stop" disabled>Stop</button><span id="lab-state" role="status">No test running</span></div>
     <div class="lab-screen"><video id="lab-video" autoplay playsinline muted></video><div id="lab-placeholder"><span>◉</span><h3>See what this computer can deliver.</h3><p>No screen capture or remote host is involved.</p></div></div>
@@ -50,6 +51,16 @@
     <canvas id="lab-source" hidden></canvas>
   </section>
 </main>
-<dialog id="device-dialog"><form id="device-form"><div class="dialog-heading"><div><div class="eyebrow">YOUR COMPUTERS</div><h2>Add a computer</h2></div><button type="button" id="close-dialog" class="icon-button" aria-label="Close add computer">×</button></div><label class="field-label" for="device-name">Computer name</label><input id="device-name" maxlength="60" placeholder="My studio computer" required><label class="field-label" for="device-id">RustDesk ID</label><input id="device-id" inputmode="numeric" placeholder="123 456 789" maxlength="20" required><p class="field-hint">Find this in RustDesk on the computer you own or have permission to use.</p><label class="field-label" for="device-ip">Peer IP <span class="muted">optional label</span></label><input id="device-ip" placeholder="192.168.1.20"><p class="field-hint">For your reference only. Connections use the verified RustDesk ID flow.</p><p id="device-error" role="alert"></p><div class="button-row dialog-actions"><button type="button" class="secondary" id="cancel-device">Cancel</button><button class="primary" type="submit">Save computer</button></div></form></dialog>
+<dialog id="device-dialog" aria-labelledby="device-title"><form id="device-form"><div class="dialog-heading"><h2 id="device-title">快速添加电脑</h2><button type="button" id="close-dialog" class="icon-button" aria-label="关闭">×</button></div><label class="field-label" for="device-name">电脑名称</label><input id="device-name" maxlength="60" placeholder="例如：工作室电脑" required><label class="field-label" for="device-id">RustDesk ID</label><input id="device-id" inputmode="numeric" placeholder="123 456 789" maxlength="20" required><p class="field-hint">从已获授权的对端设备上查看，数字 ID 为 6–12 位。</p><label class="field-label" for="device-ip">对端 IP（可选备注）</label><input id="device-ip" placeholder="例如：192.168.1.20"><p class="field-hint">仅作备注，不表示在线、身份可信或已建立加密连接。</p><p id="device-error" role="alert"></p><div class="button-row dialog-actions"><button type="button" class="secondary" id="cancel-device">取消</button><button id="save-device" class="primary" type="submit">保存电脑</button></div></form></dialog>
+<dialog id="setup-dialog" class="wizard" aria-labelledby="wizard-title">
+  <div class="dialog-heading"><div><div class="eyebrow">第一次连接，一步一步来</div><h2 id="wizard-title" tabindex="-1">准备连接程序</h2></div><button id="wizard-close" class="icon-button" aria-label="关闭向导">×</button></div>
+  <ol class="wizard-steps" aria-label="向导进度"><li>1 程序</li><li>2 网络</li><li>3 对端</li><li>4 确认</li></ol>
+  <section data-wizard-step="0"><p>当前预览版会打开独立的 RustDesk 窗口。两台电脑都需要相应的连接程序；本向导不会安装程序或建立会话。</p><div class="wizard-card"><strong>这台电脑的连接程序</strong><p id="wizard-engine-status" role="status">正在检查…</p><button class="secondary" id="wizard-engine">选择已有 RustDesk</button><p class="field-hint">只支持已审查的 Windows x64 1.5.0 程序。Mac 引擎暂不可用。</p></div><p class="field-hint">尚未准备好也可以继续保存设备，稍后再配置。选择的程序路径会立即保存。</p></section>
+  <section data-wizard-step="1" hidden><p>以下地址来自本机网卡，不会扫描或探测其他设备。</p><div class="wizard-card"><div class="section-heading"><strong id="wizard-local-name">这台电脑</strong><button class="text-button" id="wizard-refresh">刷新地址</button></div><div id="wizard-addresses"></div></div><dl class="network-status"><div><dt>Tailscale 客户端 / 对端可达性</dt><dd>未知 · 未查询或探测</dd></div><div><dt>实际会话路径 / 加密状态</dt><dd>未知 · 尚未建立会话</dd></div></dl><p class="field-hint">即使两台设备都有 Tailscale，也需核实对端身份与访问许可。网卡名称和地址不能证明已加密或直连。</p></section>
+  <section data-wizard-step="2" hidden><p>在另一台已获授权的电脑上查看 RustDesk ID，填在这里。</p><label class="field-label" for="wizard-name">电脑名称</label><input id="wizard-name" maxlength="60" placeholder="例如：我的 Mac"><label class="field-label" for="wizard-id">RustDesk ID</label><input id="wizard-id" inputmode="numeric" maxlength="20" placeholder="123 456 789"><label class="field-label" for="wizard-ip">对端 IP（可选备注）</label><input id="wizard-ip" placeholder="LAN 或 Tailscale 地址"><p class="field-hint">不要填写密码。IP 只作备注，当前通过 RustDesk ID 打开会话。</p></section>
+  <section data-wizard-step="3" hidden><div class="wizard-card"><strong id="wizard-peer-summary"></strong><p id="wizard-peer-address"></p><span class="badge">仅保存 · 不发起连接</span></div><ul class="permission-list"><li>请对方在 RustDesk 中确认本次访问，并核对身份。</li><li>按需选择仅查看或键鼠控制；文件传输单独授权。</li><li>Mac 被控端的屏幕录制与辅助功能权限，需要设备使用者在系统设置中确认。</li></ul><p>保存后回到主页。只有你勾选连接许可并点击“在 RustDesk 中继续”，才会尝试打开程序。</p></section>
+  <p id="wizard-error" role="alert"></p>
+  <div class="wizard-footer"><button id="wizard-cancel" class="text-button">稍后再说</button><div class="button-row"><button id="wizard-back" class="secondary" hidden>上一步</button><button id="wizard-next" class="primary">下一步</button></div></div>
+</dialog>
 <script src="app.js"></script>
 </body></html>

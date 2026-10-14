@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 
 // An explicit distribution contract, not a glob over a developer checkout.
 const APP_FILES = Object.freeze(['package.json', 'src/app.js', 'src/core.cjs',
-  'src/engine.cjs', 'src/index.html', 'src/main.cjs', 'src/preload.cjs', 'src/style.css']);
+  'src/engine.cjs', 'src/index.html', 'src/main.cjs', 'src/network.cjs', 'src/preload.cjs', 'src/style.css']);
 const DOCUMENTS = Object.freeze({ 'LICENSE': 'PROJECT-LICENSE.txt',
   'desktop/README.md': 'READ-ME.md', 'desktop/docs/MACOS-HANDOFF.md': 'MACOS-HANDOFF.md' });
 const sha256 = data => createHash('sha256').update(data).digest('hex');
